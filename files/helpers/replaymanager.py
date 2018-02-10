@@ -63,9 +63,11 @@ class ReplayManager:
     def __init__(self):
         # Open the configuration file
         self.config = configparser.ConfigParser()
-        config.read('roa.ini')
+        config_dname = os.path.abspath(os.path.dirname(__file__))
+        config_apath = os.path.join(config_dname, 'roa.ini')
+        self.config.read(config_apath)
         # Establish path to replays folder
-        self.replays_apath = config['RivalsofAether']['PathToReplays']
+        self.replays_apath = self.config['RivalsofAether']['PathToReplays']
         print('-Set path to replays folder:', self.replays_apath)
         # Initialize subdataset values to 'None'
         self.__flush_subdataset()
@@ -134,14 +136,14 @@ class ReplayManager:
         '''Get a new .roa file.'''
         print('-Retrieving replay file from unvisited subdataset')
         # Get the next .roa from the unvisited list
-        if not self.dataset_unvisited:
+        if not self.subdataset_unvisited:
             return None
         roa_fname = self.subdataset_unvisited[0]
 
         # Replace current .roas with the next .roa and mark latter as visited
         self.__flush_replays()
         self.__transfer_roa(roa_fname)
-        self.__visit(roa_fname)
+        self.__visit_roa(roa_fname)
 
         if apath:
             return os.path.join(self.subdataset_apath, roa_fname)
@@ -172,13 +174,13 @@ class ReplayManager:
         # Copy the specified replay file to the game's replays folder
         roa_apath = os.path.join(self.subdataset_apath, roa_fname)
         shutil.copy(roa_apath, self.replays_apath)
-        print('--Transferred,' roa_fname, 'to replays folder')
+        print('--Transferred', roa_fname, 'to replays folder')
 
     def __visit_roa(self, roa_fname):
         '''Mark specified .roa file as visited.'''
-        self.dataset_visited.append(roa_fname)
-        self.dataset_unvisited.remove(roa_fname)
-        print('--Marked', roa_fname, 'as visited.'
+        self.subdataset_visited.append(roa_fname)
+        self.subdataset_unvisited.remove(roa_fname)
+        print('--Marked', roa_fname, 'as visited.')
 
 
 if __name__ == '__main__':

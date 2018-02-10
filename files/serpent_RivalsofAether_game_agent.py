@@ -5,7 +5,7 @@ from serpent.frame_grabber import FrameGrabber
 from serpent.input_controller import KeyboardKey
 
 from .helpers.replaymanager import ReplayManager, Game
-from .helpers.parser.replayparser import Replay
+from .helpers.parser.replayparser import Replay, Character, Action
 
 import datetime
 import time
@@ -20,8 +20,7 @@ class SerpentRivalsofAetherGameAgent(GameAgent):
         self.frame_handler_setups["COLLECT"] = self.setup_collect
         self.analytics_client = None
 
-    def setup_play(self):
-        print('setup_play: Hellow') # For debugging
+    def setup_common(self):
         self.input_mapping = {
             'Z': KeyboardKey.KEY_Z,
             'X': KeyboardKey.KEY_X,
@@ -45,19 +44,22 @@ class SerpentRivalsofAetherGameAgent(GameAgent):
             KeyboardKey.KEY_RIGHT.name: 'RIGHT'
         }
 
+    def setup_play(self):
+        self.setup_common()
+        # TODO Additional setup
+
     def setup_collect(self):
-        print('setup_collect: HelloWo')
+        self.setup_common()
         self.replay_manager = ReplayManager()
         self.replay_manager.load_subdataset()
         self.game_state = Game.State.SPLASH_SCREEN
 
     def handle_play(self, game_frame):
-        print('handle_play: Hellow') # For debugging
+        # TODO this
+            pass
 
     def handle_collect(self, game_frame):
-        print('handle_collect: HelloWo') # Also for debugging
-
-        # Go from splash screen to replay menu
+        # Go from splash screen to replays menu
         if self.game_state is Game.State.SPLASH_SCREEN:
             self.tap_sequence(Game.Sequence.splash_to_main)
             self.tap_sequence(Game.Sequence.main_to_replay)
@@ -65,13 +67,16 @@ class SerpentRivalsofAetherGameAgent(GameAgent):
         # Go from replay menu to playback
         elif self.game_state is Game.State.REPLAY_MENU:
             roa_apath = self.replay_manager.next_roa(apath=True)
-            self.roa = parse_wrapper(roa_fname)
+            self.roa = Replay(roa_apath)
             self.tap_sequence(Game.Sequence.start_replay_1)
             self.game_state = Game.State.REPLAY_PLAYBACK
         # Collect frames during playback
         elif self.game_state is Game.State.REPLAY_PLAYBACK:
             # TODO: Write this
             pass
+
+    def debug_print(self, message):
+        print(self.decoration + ': ' + message)
 
     def tap_sequence(self, sequence, delay_override=None):
         # Must contain delay value and one input/wait token
