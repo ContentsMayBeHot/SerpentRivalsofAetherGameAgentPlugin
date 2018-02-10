@@ -4,6 +4,14 @@ import os
 import random
 import re
 import shutil
+import sys
+
+
+def main():
+    '''Sort replays by version'''
+    manager = ReplayManager()
+    manager.sort_roas_into_subdatasets()
+
 
 class Game:
     FRAMES_PER_SECOND = 60.0
@@ -53,29 +61,22 @@ class Game:
 
 class ReplayManager:
     def __init__(self):
-        # Get path to plugins folder
-        # Traversing symlinks: https://stackoverflow.com/a/3220762
-        plugins_relpath = os.path.join('..', '..', '..')
-        plugins_apath = os.path.join(os.path.dname(plugins_relpath),
-                                       os.readlink(plugins_relpath))
-        # Establish path from plugins folder to configuration file
-        self.config_apath = os.path.join(plugins_path, '..',
-                                           'scripts', 'roa.ini')
         # Open the configuration file
         self.config = configparser.ConfigParser()
-        config.read(self.config_apath)
-
+        config.read('roa.ini')
         # Establish path to replays folder
         self.replays_apath = config['RivalsofAether']['PathToReplays']
-
+        print('-Set path to replays folder:', self.replays_apath)
         # Initialize subdataset values to 'None'
         self.__flush_subdataset()
 
-    def establish_subdatasets(self):
+    def sort_roas_into_subdatasets(self):
         '''Sort .roa files by version into subdatasets'''
+        print('-Sorting replays by game version')
         for dirent in os.listdir(self.replays_apath):
             if not dirent.endswith('.roa'):
                 continue
+            print('--Found replay file:', dirent)
             dirent_apath = os.path.join(self.replays_apath, roa_fname)
             # Open the .roa file
             with open(dirent_apath) as fin:
@@ -84,13 +85,16 @@ class ReplayManager:
                 version = '{}_{}_{}'.format(str(ln[1:3]),
                                             str(ln[3:5]),
                                             str(ln[5:7]))
+                print('---Version string:', version)
                 # Ensure subdataset folder exists
                 subdataset_apath = os.path.join(self.replays_apath, version)
                 if not os.path.exists(subdataset_apath):
                     os.mkdir(subdataset_apath)
+                    print('---Created new folder for subdataset')
                 # Move the replay to the new directory
                 new_dirent_apath = os.path.join(subdataset_apath, dirent)
                 os.rename(dirent_apath, new_dirent_apath)
+                print('---Moved replay file')
 
     def load_subdataset(self, subdataset_dname=None):
         '''Load the subdataset for a particular game version.'''
@@ -104,6 +108,8 @@ class ReplayManager:
             dirent for dirent in os.listdir(self.subdataset_apath)
             if dirent.endswith('.roa')
             ]
+        print('-Loaded subdataset into memory:', subdataset_dname)
+        print('--Subdataset size:', len(self.subdataset))
         self.subdataset_unvisited = list(self.subdataset) # Ensure it's a copy
         self.subdataset_visited = []
 
@@ -126,6 +132,7 @@ class ReplayManager:
 
     def next_roa(self, apath=False):
         '''Get a new .roa file.'''
+        print('-Retrieving replay file from unvisited subdataset')
         # Get the next .roa from the unvisited list
         if not self.dataset_unvisited:
             return None
@@ -138,6 +145,7 @@ class ReplayManager:
 
         if apath:
             return os.path.join(self.subdataset_apath, roa_fname)
+        print('-Retrieved replay file:', roa_fname)
         return roa_fname
 
     def __flush_subdataset(self):
@@ -146,6 +154,7 @@ class ReplayManager:
         self.subdataset = None
         self.subdataset_unvisited = None
         self.subdataset_visited = None
+        print('--Flushed subdataset')
 
     def __flush_replays(self):
         ''' Remove all .roa files from the replays folder.'''
@@ -156,37 +165,21 @@ class ReplayManager:
                 # Delete the .roa file
                 dirent_apath = os.path.join(self.replays_apath, dirent)
                 os.remove(dirent_apath)
+        print('--Flushed replays folder')
 
     def __transfer_roa(self, roa_fname):
         '''Copy specified .roa file from subdataset folder to replays folder.'''
         # Copy the specified replay file to the game's replays folder
         roa_apath = os.path.join(self.subdataset_apath, roa_fname)
         shutil.copy(roa_apath, self.replays_apath)
+        print('--Transferred,' roa_fname, 'to replays folder')
 
     def __visit_roa(self, roa_fname):
         '''Mark specified .roa file as visited.'''
         self.dataset_visited.append(roa_fname)
         self.dataset_unvisited.remove(roa_fname)
+        print('--Marked', roa_fname, 'as visited.'
 
 
-# Reference: https://github.com/sorki/python-mnist/blob/master/mnist/loader.py
-class ReplayLoader:
-    def __init__(self, replays_apath='.'):
-        self.replays_apath = replays_apath
-        self.testing_dname = 'testing'
-        self.training_dname = 'training'
-
-        self.testing_x = []
-        self.testing_y = []
-
-        self.training_x = []
-        self.training_y = []
-
-    def load(self, x_apath, y_apath):
-        pass
-
-    def load_testing(self):
-        return self.testing_x, self.testing_y
-
-    def load_training(self):
-        return self.training_x, self.training_y
+if __name__ == '__main__':
+    main()
