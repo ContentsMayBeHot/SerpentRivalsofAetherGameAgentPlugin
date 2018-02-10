@@ -4,8 +4,8 @@ from serpent.input_controller import KeyboardKey
 from serpent.frame_grabber import FrameGrabber
 from serpent.input_controller import KeyboardKey
 
-from .helpers.replay_management import ReplayManager
-from .helpers.replay_management import Game
+from .helpers.replaymanager import ReplayManager, Game
+from .helpers.parser.replayparser import Replay
 
 import datetime
 import time
@@ -20,7 +20,8 @@ class SerpentRivalsofAetherGameAgent(GameAgent):
         self.frame_handler_setups["COLLECT"] = self.setup_collect
         self.analytics_client = None
 
-    def setup_common(self):
+    def setup_play(self):
+        print('setup_play: Hellow') # For debugging
         self.input_mapping = {
             'Z': KeyboardKey.KEY_Z,
             'X': KeyboardKey.KEY_X,
@@ -44,21 +45,18 @@ class SerpentRivalsofAetherGameAgent(GameAgent):
             KeyboardKey.KEY_RIGHT.name: 'RIGHT'
         }
 
-    def setup_play(self):
-        self.setup_common()
-
     def setup_collect(self):
-        self.setup_common()
-
+        print('setup_collect: HelloWo')
         self.replay_manager = ReplayManager()
         self.replay_manager.load_subdataset()
-
         self.game_state = Game.State.SPLASH_SCREEN
 
     def handle_play(self, game_frame):
-        print('Hellow')
+        print('handle_play: Hellow') # For debugging
 
     def handle_collect(self, game_frame):
+        print('handle_collect: HelloWo') # Also for debugging
+
         # Go from splash screen to replay menu
         if self.game_state is Game.State.SPLASH_SCREEN:
             self.tap_sequence(Game.Sequence.splash_to_main)
