@@ -5,6 +5,7 @@ import random
 import re
 import shutil
 import sys
+import time
 
 
 def main():
@@ -57,6 +58,7 @@ class Game:
         main_to_replay = [0.5, 'DOWN', 'DOWN', 'DOWN', 'Z', 1, 'Z']
         start_replay_1 = [1, 'Z', 'Z']
         back_and_forth = [1, 'X', 'Z']
+        end_postreplay = [1, 'Z', 'Z']
 
 
 class ReplayManager:
@@ -181,6 +183,19 @@ class ReplayManager:
         self.subdataset_visited.append(roa_fname)
         self.subdataset_unvisited.remove(roa_fname)
         print('--Marked', roa_fname, 'as visited.')
+
+
+class PlaybackManager:
+    def __init__(self, duration):
+        self.start = time.time()
+        self.duration = duration
+        self.end = self.start +  duration
+
+    def is_running(self):
+        return time.time() < self.end
+
+    def time_left(self):
+        return self.end - time.time()
 
 
 if __name__ == '__main__':

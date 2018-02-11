@@ -4,7 +4,7 @@ from serpent.input_controller import KeyboardKey
 from serpent.frame_grabber import FrameGrabber
 from serpent.input_controller import KeyboardKey
 
-from .helpers.replaymanager import ReplayManager, Game
+from .helpers.replaymanager import ReplayManager, PlaybackManager, Game
 from .helpers.parser.replayparser import Replay, Character, Action
 
 import datetime
@@ -52,31 +52,30 @@ class SerpentRivalsofAetherGameAgent(GameAgent):
         self.setup_common()
         self.replay_manager = ReplayManager()
         self.replay_manager.load_subdataset()
-        self.game_state = Game.State.SPLASH_SCREEN
+        self.game_state = Game.State.REPLAY_MENU
 
     def handle_play(self, game_frame):
         # TODO this
             pass
 
     def handle_collect(self, game_frame):
-        # Go from splash screen to replays menu
-        if self.game_state is Game.State.SPLASH_SCREEN:
-            self.tap_sequence(Game.Sequence.splash_to_main)
-            self.tap_sequence(Game.Sequence.main_to_replay)
-            self.game_state = Game.State.REPLAY_MENU
         # Go from replay menu to playback
-        elif self.game_state is Game.State.REPLAY_MENU:
+        if self.game_state is Game.State.REPLAY_MENU:
             roa_apath = self.replay_manager.next_roa(apath=True)
             self.roa = Replay(roa_apath)
             self.tap_sequence(Game.Sequence.start_replay_1)
+            self.playback = PlaybackManager(self.roa.get_duration())
             self.game_state = Game.State.REPLAY_PLAYBACK
         # Collect frames during playback
         elif self.game_state is Game.State.REPLAY_PLAYBACK:
-            # TODO: Write this
-            pass
-
-    def debug_print(self, message):
-        print(self.decoration + ': ' + message)
+            if self.playback.is_running():
+                print('Watching owo')
+                # TODO: Everything
+                print(self.playback.time_left())
+            else:
+                print('Done uwu')
+                self.tap_sequence(Game.Sequence.end_postreplay)
+                self.game_state = Game.State.REPLAY_MENU
 
     def tap_sequence(self, sequence, delay_override=None):
         # Must contain delay value and one input/wait token
