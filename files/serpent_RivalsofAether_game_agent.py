@@ -4,7 +4,7 @@ from serpent.input_controller import KeyboardKey
 from serpent.frame_grabber import FrameGrabber
 from serpent.input_controller import KeyboardKey
 
-from .helpers.replaymanager import ReplayManager, PlaybackManager, Game
+from .helpers.replaymanager import ReplayManager, PlaybackTimer, Game
 from .helpers.parser.replayparser import Replay, Character, Action
 
 import datetime
@@ -21,6 +21,7 @@ class SerpentRivalsofAetherGameAgent(GameAgent):
         self.analytics_client = None
 
     def setup_common(self):
+        '''Perform setup for both play and frame collection'''
         self.input_mapping = {
             'Z': KeyboardKey.KEY_Z,
             'X': KeyboardKey.KEY_X,
@@ -45,39 +46,60 @@ class SerpentRivalsofAetherGameAgent(GameAgent):
         }
 
     def setup_play(self):
+        '''Perform setup for play'''
         self.setup_common()
         # TODO Additional setup
 
     def setup_collect(self):
+        '''Perform setup for frame collection'''
         self.setup_common()
-        self.replay_manager = ReplayManager()
-        self.replay_manager.load_subdataset()
+
+        self.manager = ReplayManager()
+        self.manager.load_subdataset()
+        self.playback = PlaybackTimer()
+
         self.game_state = Game.State.REPLAY_MENU
 
     def handle_play(self, game_frame):
-        # TODO this
-            pass
+        '''Frame handler for play mode. To invoke, run:
+        serpent play RivalsofAether SerpentRivalsofAetherGameAgent PLAY
+        '''
+        pass # TODO this
 
     def handle_collect(self, game_frame):
-        # Go from replay menu to playback
+        '''Frame handler for frame collection mode. To invoke, run:
+        serpent play RivalsofAether SerpentRivalsofAetherGameAgent COLLECT
+        '''
+        # State 1: Replay menu
         if self.game_state is Game.State.REPLAY_MENU:
-            roa_apath = self.replay_manager.next_roa(apath=True)
+            roa_apath = self.manager.next_roa(apath=True)
             self.roa = Replay(roa_apath)
+
+            self.tap_sequence(Game.Sequence.back_and_forth)
             self.tap_sequence(Game.Sequence.start_replay_1)
-            self.playback = PlaybackManager(self.roa.get_duration())
+            self.playback.start(self.roa.get_duration())
+
             self.game_state = Game.State.REPLAY_PLAYBACK
-        # Collect frames during playback
+        # State 2: Playback
         elif self.game_state is Game.State.REPLAY_PLAYBACK:
-            if self.playback.is_running():
-                print('Watching owo')
+            # State 2-A: Playback in progress
+            if self.playback.is_playing():
+                print(('Watching owo',
+                       '\tELAPSED:', self.playback.seconds_elapsed(),
+                       '/', self.playback.seconds_remaining())
+                      )
                 # TODO: Everything
-                print(self.playback.time_left())
+                timestamp = game_frame.timestamp
+                time_offset = self.playback.seconds_elapsed_since(timestamp)
+                self.manager.save_frame(game_frame.frame, time_offset * 60)
+            # State 2-B: Playback end
             else:
                 print('Done uwu')
                 self.tap_sequence(Game.Sequence.end_postreplay)
                 self.game_state = Game.State.REPLAY_MENU
 
     def tap_sequence(self, sequence, delay_override=None):
+        '''Pass input sequence to the input controller'''
         # Must contain delay value and one input/wait token
         if len(sequence) < 2:
             return
