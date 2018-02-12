@@ -149,7 +149,8 @@ class ReplayManager:
             os.mkdir(roa_frames_apath)
 
         # Write the numpy array to a file in that folder
-        fout_apath = os.path.join(roa_frames_apath, str(identifier))
+        fout_fname = str(int(identifier)) + '.np'
+        fout_apath = os.path.join(roa_frames_apath, fout_fname)
         print('--Saving frame:', fout_apath)
         with open(fout_apath, 'wb') as fout:
             np.save(fout, frame)
