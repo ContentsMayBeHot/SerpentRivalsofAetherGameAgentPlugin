@@ -76,25 +76,26 @@ class SerpentRivalsofAetherGameAgent(GameAgent):
             self.roa = Replay(roa_apath)
 
             self.tap_sequence(Game.Sequence.back_and_forth)
-            self.tap_sequence(Game.Sequence.start_replay_1)
+
             self.playback.start(self.roa.get_duration())
+            
+            self.tap_sequence(Game.Sequence.start_replay_1)
 
             self.game_state = Game.State.REPLAY_PLAYBACK
         # State 2: Playback
         elif self.game_state is Game.State.REPLAY_PLAYBACK:
             # State 2-A: Playback in progress
             if self.playback.is_playing():
-                print(('Watching owo',
-                       '\tELAPSED:', self.playback.seconds_elapsed(),
-                       '/', self.playback.seconds_remaining())
-                      )
+                elapsed = self.playback.seconds_elapsed()
+                remaining = self.playback.seconds_remaining()
+                print('owo ~ Watching\t{}/{}'.format(elapsed, remaining))
                 # TODO: Everything
                 timestamp = game_frame.timestamp
                 time_offset = self.playback.seconds_elapsed_since(timestamp)
                 self.manager.save_frame(game_frame.frame, time_offset * 60)
             # State 2-B: Playback end
             else:
-                print('Done uwu')
+                print('uwu ~ Finished watching ')
                 self.tap_sequence(Game.Sequence.end_postreplay)
                 self.game_state = Game.State.REPLAY_MENU
 
