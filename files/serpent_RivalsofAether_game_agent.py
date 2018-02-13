@@ -82,13 +82,22 @@ class SerpentRivalsofAetherGameAgent(GameAgent):
         elif self.game_state is Game.State.REPLAY_PLAYBACK:
             # State 2-A: Playback in progress
             if self.playback.is_playing():
+                printout = 'owo ~ Watching'
+
+                # Get information about time left
                 elapsed = self.playback.seconds_elapsed()
                 remaining = self.playback.seconds_remaining()
-                print('owo ~ Watching\t{}/{}'.format(elapsed, remaining))
-                # TODO: Everything
+                printout += '\t{0:.2f}/{0:.2f}'.format(elapsed, remaining)
+
+                # Get frame data and frame offset for saving
                 timestamp = game_frame.timestamp
                 time_offset = self.playback.seconds_elapsed_since(timestamp)
-                self.manager.save_frame(game_frame.frame, time_offset * 60)
+                frame_offset = int(time_offset * 60)
+                frame = game_frame.eighth_resolution_grayscale_frame
+                fout_rpath = self.manager.save_frame(frame, frame_offset)
+                printout += '\tWrote: {}'.format(fout_rpath)
+
+                print(printout)
             # State 2-B: Playback end
             else:
                 print('uwu ~ Finished watching ')

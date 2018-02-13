@@ -142,7 +142,7 @@ class ReplayManager:
             return os.path.join(self.replays_apath, roa_fname)
         return roa_fname
 
-    def save_frame(self, frame, identifier):
+    def save_frame(self, frame, frame_offset, return_apath=False):
         # Get the name of the current replay file
         roa_fname = self.__detect_roa()
         if not roa_fname:
@@ -155,12 +155,14 @@ class ReplayManager:
             os.mkdir(roa_frames_apath)
 
         # Write the numpy array to a file in that folder
-        fout_fname = str(int(identifier)) + '.np'
+        fout_fname = str(frame_offset) + '.np'
         fout_apath = os.path.join(roa_frames_apath, fout_fname)
+        result = ''
         with open(fout_apath, 'wb') as fout:
             np.save(fout, frame)
             fout_rpath = os.path.join(roa_frames_dname, fout_fname)
-            print('Saved raw frame data to "{}"'.format(fout_rpath))
+            result = fout_rpath
+        return result
 
     def __detect_roa(self):
         return [
@@ -208,17 +210,19 @@ class PlaybackTimer:
         return time.time() < self.end_time
 
     def seconds_elapsed(self):
-        '''Returns the number of seconds elapsed since playback began'''
+        '''Returns the number of seconds elapsed now'''
         return self.seconds_elapsed_since(time.time())
 
     def seconds_elapsed_since(self, timestamp):
+        '''Returns the number of seconds elapsed for a particular time'''
         return timestamp - self.start_time
 
     def seconds_remaining(self):
-        '''Returns the number of seconds remaining until the end of playback'''
+        '''Returns the number of seconds remaining now'''
         return self.seconds_remaining_after(time.time())
 
     def seconds_remaining_after(self, timestamp):
+        '''Returns the number of seconds remaining for a particular time'''
         return self.end_time - timestamp
 
 
