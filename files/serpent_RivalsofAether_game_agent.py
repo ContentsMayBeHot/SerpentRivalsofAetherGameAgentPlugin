@@ -74,13 +74,9 @@ class SerpentRivalsofAetherGameAgent(GameAgent):
         if self.game_state is Game.State.REPLAY_MENU:
             roa_apath = self.manager.next_roa(apath=True)
             self.roa = Replay(roa_apath)
-
             self.tap_sequence(Game.Sequence.back_and_forth)
-
             self.playback.start(self.roa.get_duration())
-            
             self.tap_sequence(Game.Sequence.start_replay_1)
-
             self.game_state = Game.State.REPLAY_PLAYBACK
         # State 2: Playback
         elif self.game_state is Game.State.REPLAY_PLAYBACK:
@@ -96,8 +92,8 @@ class SerpentRivalsofAetherGameAgent(GameAgent):
             # State 2-B: Playback end
             else:
                 print('uwu ~ Finished watching ')
-                self.tap_sequence(Game.Sequence.end_postreplay)
-                self.game_state = Game.State.REPLAY_MENU
+                #self.tap_sequence(Game.Sequence.end_postreplay)
+                #self.game_state = Game.State.REPLAY_MENU
 
     def tap_sequence(self, sequence, delay_override=None):
         '''Pass input sequence to the input controller'''
