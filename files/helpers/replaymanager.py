@@ -19,15 +19,15 @@ def main():
 def version_to_dname(string):
     '''Convert x.x.x to xx_xx_xx'''
     return '_'.join([
-        x if len(x) > 1 else '0' + x
-        for x in string.split('.') if x.isdigit()
+        char if len(char) > 1 else '0' + char
+        for char in string.split('.') if char.isdigit()
         ])
 
 def dname_to_version(string):
     '''Convert xx_xx_xx to x.x.x'''
     return '.'.join([
-        str(int(x))
-        for x in string.split('_') if x.isdigit()
+        str(int(char))
+        for char in string.split('_') if char.isdigit()
         ])
 
 
@@ -123,7 +123,9 @@ class ReplayManager:
     def get_existing_subdatasets(self):
         '''Get a list of subdatasets, where each represents a game version'''
         p = SUBDATASET_PATTERN
-        return [ x for x in os.listdir(self.replays_apath) if p.match(x) ]
+        return [
+            dirent for dirent in os.listdir(self.replays_apath) if p.match(dirent)
+            ]
 
     def next_roa(self, apath=False):
         '''Get a new roa file.'''
@@ -166,7 +168,8 @@ class ReplayManager:
 
     def __detect_roa(self):
         return [
-            x for x in os.listdir(self.replays_apath) if x.endswith('.roa')
+            dirent for dirent in os.listdir(self.replays_apath)
+            if dirent.endswith('.roa')
             ][0]
 
     def __flush_subdataset(self):
