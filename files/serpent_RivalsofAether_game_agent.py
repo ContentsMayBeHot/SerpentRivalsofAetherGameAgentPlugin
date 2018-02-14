@@ -75,9 +75,10 @@ class SerpentRivalsofAetherGameAgent(GameAgent):
             roa_apath = self.manager.next_roa(apath=True)
             self.roa = Replay(roa_apath)
             self.tap_sequence(Game.Sequence.back_and_forth)
-            self.playback.start(self.roa.get_duration())
             self.tap_sequence(Game.Sequence.start_replay_1)
             self.game_state = Game.State.REPLAY_PLAYBACK
+            time.sleep(1)
+            self.playback.start(self.roa.get_duration())
         # State 2: Playback
         elif self.game_state is Game.State.REPLAY_PLAYBACK:
             # State 2-A: Playback in progress
@@ -87,13 +88,14 @@ class SerpentRivalsofAetherGameAgent(GameAgent):
                 # Get information about time left
                 elapsed = self.playback.seconds_elapsed()
                 remaining = self.playback.seconds_remaining()
-                printout += '\t{0:.2f}/{0:.2f}'.format(elapsed, remaining)
+                printout += '\t{0:.2f}'.format(elapsed)
+                printout += ':{0:.2f}'.format(remaining)
 
                 # Get frame data and frame offset for saving
-                timestamp = game_frame.timestamp
-                time_offset = self.playback.seconds_elapsed_since(timestamp)
-                frame_offset = int(time_offset * 60)
-                frame = game_frame.eighth_resolution_grayscale_frame
+                #timestamp = game_frame.timestamp
+                #time_offset = self.playback.seconds_elapsed_since(timestamp)
+                frame_offset = int(elapsed * 60)
+                frame = game_frame.quarter_resolution_frame
                 fout_rpath = self.manager.save_frame(frame, frame_offset)
                 printout += '\tWrote: {}'.format(fout_rpath)
 
@@ -117,9 +119,13 @@ class SerpentRivalsofAetherGameAgent(GameAgent):
 
         # Read the rest of the sequence
         for token in sequence[1:]:
+            # Check if token is a key name
             if isinstance(token, str):
                 mapped_input = self.input_mapping[token.upper()]
                 self.input_controller.tap_key(mapped_input)
                 time.sleep(delay)
+            # Check if token is a number
             elif isinstance(token, int):
-                time.sleep(token)
+                token = int(token)
+                if token > 0:
+                    time.sleep(token)
