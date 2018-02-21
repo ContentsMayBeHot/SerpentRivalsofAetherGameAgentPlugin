@@ -73,6 +73,9 @@ class SerpentRivalsofAetherGameAgent(GameAgent):
         # State 1: Replay menu
         if self.game_state is Game.State.REPLAY_MENU:
             roa_apath = self.manager.next_roa(apath=True)
+            if not roa_apath:
+                print('^_^ ~ Done collecting')
+                sys.exit()
             self.roa = Replay(roa_apath)
             self.tap_sequence(Game.Sequence.back_and_forth)
             self.tap_sequence(Game.Sequence.start_replay_1)
@@ -84,13 +87,11 @@ class SerpentRivalsofAetherGameAgent(GameAgent):
             # State 2-A: Playback in progress
             if self.playback.is_playing():
                 printout = 'owo ~ Watching'
-
                 # Get information about time left
                 elapsed = self.playback.seconds_elapsed()
                 remaining = self.playback.seconds_remaining()
                 printout += '\t{0:.2f}'.format(elapsed)
                 printout += ':{0:.2f}'.format(remaining)
-
                 # Get frame data and frame offset for saving
                 #timestamp = game_frame.timestamp
                 #time_offset = self.playback.seconds_elapsed_since(timestamp)
@@ -98,7 +99,6 @@ class SerpentRivalsofAetherGameAgent(GameAgent):
                 frame = game_frame.quarter_resolution_frame
                 fout_rpath = self.manager.save_frame(frame, frame_offset)
                 printout += '\tWrote: {}'.format(fout_rpath)
-
                 print(printout)
             # State 2-B: Playback end
             else:

@@ -106,10 +106,17 @@ class ReplayManager:
             dirent for dirent in os.listdir(self.subdataset_apath)
             if dirent.endswith('.roa')
             ]
-        self.subdataset_unvisited = list(self.subdataset) # Ensure it's a copy
+        # Generate the unvisited set
+        self.subdataset_unvisited = []
         self.subdataset_visited = []
+        for roa_fname in self.subdataset:
+            if self.__are_frames_collected(roa_fname):
+                self.subdataset_visited.append(roa_fname)
+            else:
+                self.subdataset_unvisited.append(roa_fname)
         print('Loaded subdataset for version "{}"'.format(subdataset_dname))
         print('Subdataset size:', len(self.subdataset))
+        print('Unvisited size:', len(self.subdataset_unvisited))
 
     def get_current_version(self, as_dname=False):
         '''Get the current game version as specified in the config file'''
@@ -145,6 +152,7 @@ class ReplayManager:
         return roa_fname
 
     def save_frame(self, frame, frame_offset, return_apath=False):
+        '''Save a game frame to a pickle in the appropriate directory'''
         # Get the name of the current replay file
         roa_fname = self.__detect_roa()
         if not roa_fname:
@@ -157,7 +165,7 @@ class ReplayManager:
             os.mkdir(roa_frames_apath)
 
         # Write the numpy array to a file in that folder
-        fout_fname = str(frame_offset) + '.npy'
+        fout_fname = str(frame_offset) + '.np'
         fout_apath = os.path.join(roa_frames_apath, fout_fname)
         result = ''
         with open(fout_apath, 'wb') as fout:
@@ -166,7 +174,17 @@ class ReplayManager:
             result = fout_rpath
         return result
 
+    def __are_frames_collected(self, roa_fname):
+        '''Check if a frames folder exists for the current roa'''
+        # Check if a folder exists in frames
+        roa_frames_dname = os.path.splitext(roa_fname)[0]
+        roa_frames_apath = os.path.join(self.frames_apath, roa_frames_dname)
+        if os.path.isdir(roa_frames_apath):
+            return True
+        return False
+
     def __detect_roa(self):
+        '''Check if there is an roa in the replays folder and return its name'''
         return [
             dirent for dirent in os.listdir(self.replays_apath)
             if dirent.endswith('.roa')
