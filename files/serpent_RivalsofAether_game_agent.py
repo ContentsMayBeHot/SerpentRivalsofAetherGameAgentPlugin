@@ -5,7 +5,7 @@ from serpent.frame_grabber import FrameGrabber
 from serpent.input_controller import KeyboardKey
 
 from .helpers.replaymanager import ReplayManager, PlaybackTimer, Game
-from .helpers.parser.replayparser import Replay, Character, Action
+from .helpers.parser.roaparser import Replay
 
 import datetime
 import time
@@ -73,6 +73,7 @@ class SerpentRivalsofAetherGameAgent(GameAgent):
         # State 1: Replay menu
         if self.game_state is Game.State.REPLAY_MENU:
             roa_apath = self.manager.next_roa(apath=True)
+            # Case 1-exception: No replays left
             if not roa_apath:
                 print('^_^ ~ Done collecting')
                 sys.exit()
@@ -97,14 +98,16 @@ class SerpentRivalsofAetherGameAgent(GameAgent):
                 #time_offset = self.playback.seconds_elapsed_since(timestamp)
                 frame_offset = int(elapsed * 60)
                 frame = game_frame.quarter_resolution_frame
-                fout_rpath = self.manager.save_frame(frame, frame_offset)
-                printout += '\tWrote: {}'.format(fout_rpath)
+                frame_rpath = self.manager.save_frame(frame, frame_offset)
+                printout += '\tWrote: {}'.format(frame_rpath)
                 print(printout)
             # State 2-B: Playback end
             else:
                 print('uwu ~ Finished watching ')
-                #self.tap_sequence(Game.Sequence.end_postreplay)
-                #self.game_state = Game.State.REPLAY_MENU
+                roa_frames_apath = self.manager.get_roa_frames_directory()
+                self.roa.create_numpy(numpydir_path=roa_frames_apath)
+                self.tap_sequence(Game.Sequence.end_postreplay)
+                self.game_state = Game.State.REPLAY_MENU
 
     def tap_sequence(self, sequence, delay_override=None):
         '''Pass input sequence to the input controller'''
