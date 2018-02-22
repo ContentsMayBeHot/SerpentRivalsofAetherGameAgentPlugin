@@ -8,6 +8,7 @@ import sys
 import time
 
 
+import skimage.exposure
 import numpy as np
 
 
@@ -51,7 +52,7 @@ class Game:
         main_to_replay = [0.5, 'DOWN', 'DOWN', 'DOWN', 'Z', 1, 'Z']
         start_replay_1 = [1, 'Z', 'Z', 0]
         back_and_forth = [1, 'X', 'Z']
-        end_postreplay = [1, 'Z', 'Z']
+        end_postreplay = [1, 5, 'Z', 'Z', 2]
 
 
 class ReplayManager:
@@ -72,7 +73,10 @@ class ReplayManager:
             os.mkdir(self.frames_apath)
 
     def sort_roas_into_subdatasets(self):
-        '''Sort .roa files by version into subdatasets'''
+        '''Purpose: Sort .roa files by version into subdatasets
+        Pre: None
+        Post: Replays sorted into subdatasets
+        '''
         print('Establishing subdatasets:')
         for dirent in os.listdir(self.replays_apath):
             if not dirent.endswith('.roa'):
@@ -95,7 +99,10 @@ class ReplayManager:
                 print('Sorted "{}" into "{}"'.format(dirent, version))
 
     def load_subdataset(self, subdataset_dname=None):
-        '''Load the subdataset for a particular game version'''
+        '''Purpose: Load the subdataset for a particular game version
+        Pre: Replays sorted into subdatasets
+        Post: Subdataset loaded
+        '''
         # If no folder provided, choose the one for version specified in config
         if not subdataset_dname:
             subdataset_dname = self.get_current_version(as_dname=True)
@@ -119,7 +126,10 @@ class ReplayManager:
         print('Unvisited size:', len(self.subdataset_unvisited))
 
     def get_current_version(self, as_dname=False):
-        '''Get the current game version as specified in the config file'''
+        '''Purpose: Get the current game version as specified in the config file
+        Pre: Config file contains version
+        Post: Returns version string
+        '''
         # Get in this format: x.y.z
         version = self.config['RivalsofAether']['GameVersion']
         if as_dname:
@@ -128,14 +138,30 @@ class ReplayManager:
         return version
 
     def get_existing_subdatasets(self):
-        '''Get a list of subdatasets, where each represents a game version'''
+        '''Purpose: Get a list of subdatasets
+        Pre: Replays sorted into subdatasets
+        Post: Returns list
+        '''
         p = SUBDATASET_PATTERN
         return [
             dirent for dirent in os.listdir(self.replays_apath) if p.match(dirent)
             ]
 
+    def get_roa_frames_directory(self):
+        # Get the name of the current replay file
+        roa_fname = self.__detect_roa()
+        if not roa_fname:
+            return ''
+        # Derive frames directory name from replay file name
+        roa_frames_dname = os.path.splitext(roa_fname)[0]
+        # Concatenate with frames master folder absolute path
+        return os.path.join(self.frames_apath, roa_frames_dname)
+
     def next_roa(self, apath=False):
-        '''Get a new roa file.'''
+        '''Purpose: Get a new roa file
+        Pre: Subdataset loaded
+        Post: Replaces current replay with an unvisited one and marks as visited
+        '''
         # Get the next .roa from the unvisited list
         if not self.subdataset_unvisited:
             return None
@@ -152,11 +178,14 @@ class ReplayManager:
         return roa_fname
 
     def save_frame(self, frame, frame_offset, return_apath=False):
-        '''Save a game frame to a pickle in the appropriate directory'''
+        '''Purpose: Save a game frame
+        Pre: Subdataset loaded
+        Post: Saves game frame as NumPy pickle
+        '''
         # Get the name of the current replay file
         roa_fname = self.__detect_roa()
         if not roa_fname:
-            return
+            return ''
 
         # Ensure existence of folder for this replay file's frames
         roa_frames_dname = os.path.splitext(roa_fname)[0]
@@ -173,6 +202,35 @@ class ReplayManager:
             fout_rpath = os.path.join(roa_frames_dname, fout_fname)
             result = fout_rpath
         return result
+
+    def cull_low_contrast(self):
+        '''Purpose: Delete all frames with low contrast
+        Pre: Subdataset loaded
+        Post: Frames with low contrast deleted
+        '''
+        i = 0
+        for roa_fname in self.subdataset_visited:
+            # Get a list of all of the frame dump files
+            roa_frames_dname = os.path.splitext(roa_fname)[0]
+            roa_frames_apath = os.path.join(self.frames_apath, roa_frames_dname)
+            roa_frames = [
+                dirent for dirent in os.listdir(roa_frames_apath)
+                if dirent.endswith('.np')
+                ]
+            # Sort by frame index in descending order
+            roa_frames = sorted(roa_frames,
+                                key=lambda x: int(os.path.splitext(x)[0]),
+                                reverse=True)
+            # Cull until low contrast images are gone
+            for frame_fname in roa_frames:
+                frame_apath = os.path.join(roa_frames_apath, frame_fname)
+                frame = np.load(frame_apath)
+                if skimage.exposure.is_low_contrast(frame):
+                    os.remove(frame_apath)
+                    i += 1
+                else:
+                    break
+        print('Deleted {} low contrast frames'.format(i))
 
     def __are_frames_collected(self, roa_fname):
         '''Check if a frames folder exists for the current roa'''
