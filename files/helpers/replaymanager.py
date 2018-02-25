@@ -171,6 +171,7 @@ class ReplayManager:
         self.__flush_replays()
         self.__transfer_roa(roa_fname)
         self.__visit_roa(roa_fname)
+        self.__ensure_frames_dir(roa_fname)
 
         print('Fetching replay file "{}"'.format(roa_fname))
         if apath:
@@ -187,12 +188,6 @@ class ReplayManager:
         if not roa_fname:
             return ''
 
-        # Ensure existence of folder for this replay file's frames
-        roa_frames_dname = os.path.splitext(roa_fname)[0]
-        roa_frames_apath = os.path.join(self.frames_apath, roa_frames_dname)
-        if not os.path.isdir(roa_frames_apath):
-            os.mkdir(roa_frames_apath)
-
         # Write the numpy array to a file in that folder
         fout_fname = str(frame_offset) + '.np'
         fout_apath = os.path.join(roa_frames_apath, fout_fname)
@@ -202,6 +197,9 @@ class ReplayManager:
             fout_rpath = os.path.join(roa_frames_dname, fout_fname)
             result = fout_rpath
         return result
+
+    def save_parsed_roa(self, roa_nparrs):
+        roa_frames_apath = self.get_roa_frames_directory()
 
     def cull_low_contrast(self):
         '''Purpose: Delete all frames with low contrast
@@ -231,6 +229,14 @@ class ReplayManager:
                 else:
                     break
         print('Deleted {} low contrast frames'.format(i))
+
+    def __ensure_frames_dir(self, roa_fname):
+        # Ensure existence of folder for this replay file's frames
+        roa_frames_dname = os.path.splitext(roa_fname)[0]
+        roa_frames_apath = os.path.join(self.frames_apath, roa_frames_dname)
+        if not os.path.isdir(roa_frames_apath):
+            os.mkdir(roa_frames_apath)
+        return roa_frames_apath
 
     def __are_frames_collected(self, roa_fname):
         '''Check if a frames folder exists for the current roa'''

@@ -5,7 +5,7 @@ from serpent.frame_grabber import FrameGrabber
 from serpent.input_controller import KeyboardKey
 
 from .helpers.replaymanager import ReplayManager, PlaybackTimer, Game
-from .helpers.parser.roaparser import Replay
+from .helpers.parser.roaparser import Replay, Player
 
 import datetime
 import time
@@ -104,8 +104,8 @@ class SerpentRivalsofAetherGameAgent(GameAgent):
             # State 2-B: Playback end
             else:
                 print('uwu ~ Finished watching ')
-                roa_frames_apath = self.manager.get_roa_frames_directory()
-                self.roa.create_numpy(numpydir_path=roa_frames_apath)
+                roa_nparrs = [ p.collapse_actions() for p in self.roa.players ]
+                self.manager.save_parsed_roa(roa_nparrs)
                 self.tap_sequence(Game.Sequence.end_postreplay)
                 self.game_state = Game.State.REPLAY_MENU
 
