@@ -106,8 +106,8 @@ class ReplayManager:
         '''
         # Get the name of the subdataset from the configuration file
         version = self.config['RivalsofAether']['GameVersion']
-        subdataset_dname = version_to_dname(version)
-        self.subdataset_apath = os.path.join(self.replays_apath, subdataset_dname)
+        version_dname = version_to_dname(version)
+        self.subdataset_apath = os.path.join(self.replays_apath, version_dname)
         # Load subdataset from its folder
         self.subdataset = [
             dirent for dirent in os.listdir(self.subdataset_apath)
@@ -121,14 +121,14 @@ class ReplayManager:
                 self.subdataset_visited.append(roa_fname)
             else:
                 self.subdataset_unvisited.append(roa_fname)
-        print('Loaded subdataset for version "{}"'.format(subdataset_dname))
+        print('Loaded subdataset for version "{}"'.format(version_dname))
         print('Subdataset size:', len(self.subdataset))
         print('Unvisited size:', len(self.subdataset_unvisited))
 
     def next_roa(self):
         '''Purpose: Get a new roa file
         Pre: Subdataset loaded
-        Post: Replaces current replay with an unvisited one and marks as visited
+        Post: Replaces current replay with an unvisited one
         '''
         # Select the next replay file name from the unvisited subdataset
         if not self.subdataset_unvisited:
