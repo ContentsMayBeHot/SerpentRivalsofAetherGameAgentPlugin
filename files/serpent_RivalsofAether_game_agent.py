@@ -75,14 +75,15 @@ class SerpentRivalsofAetherGameAgent(GameAgent):
             roa_apath = self.manager.next_roa()
             # Case 1-exception: No replays left
             if not roa_apath:
-                print('^_^ ~ Done collecting')
+                print('^w^ ~ Done collecting')
                 sys.exit()
             self.roa = Replay(roa_apath)
+            duration = self.roa.get_duration()
             self.tap_sequence(Game.Sequence.back_and_forth)
             self.tap_sequence(Game.Sequence.start_replay_1)
             self.game_state = Game.State.REPLAY_PLAYBACK
             time.sleep(1)
-            self.playback.start(self.roa.get_duration())
+            self.playback.start(duration)
         # State 2: Playback
         elif self.game_state is Game.State.REPLAY_PLAYBACK:
             # State 2-A: Playback in progress
@@ -104,10 +105,12 @@ class SerpentRivalsofAetherGameAgent(GameAgent):
             # State 2-B: Playback end
             else:
                 print('uwu ~ Finished watching ')
-                roa_matrix = [ p.collapse_actions() for p in self.roa.players ]
-                rpaths = self.manager.save_parsed_roa(roa_matrix)
-                for rpath in matrix_rpaths:
-                    print('Wrote: {}'.format(rpath))
+                roa_matrices = [
+                    p.collapse_actions() for p in self.roa.players
+                    ]
+                rpaths = self.manager.save_labels(roa_matrices)
+                for rp in rpaths:
+                    print('Wrote: {}'.format(rp))
                 self.tap_sequence(Game.Sequence.end_postreplay)
                 self.game_state = Game.State.REPLAY_MENU
 

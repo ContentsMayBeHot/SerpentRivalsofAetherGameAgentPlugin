@@ -65,10 +65,13 @@ class ReplayManager:
         self.config.read(config_apath)
         # Establish path to replays folder
         self.replays_apath = self.config['RivalsofAether']['PathToReplays']
-        # Ensure frames folder exists
+        # Ensure frames and labels folder exists
         self.frames_apath = os.path.join(self.replays_apath, 'frames')
         if not os.path.isdir(self.frames_apath):
             os.mkdir(self.frames_apath)
+        self.labels_apath = os.path.join(self.replays_apath, 'labels')
+        if not os.path.isdir(self.labels_apath):
+            os.mkdir(self.labels_apath)
 
     def sort_roas_into_subdatasets(self):
         '''Purpose: Sort .roa files by version into subdatasets
@@ -114,7 +117,7 @@ class ReplayManager:
         self.subdataset_unvisited = []
         self.subdataset_visited = []
         for roa_fname in self.subdataset:
-            if self.__are_frames_collected(roa_fname):
+            if self.__is_collected(roa_fname):
                 self.subdataset_visited.append(roa_fname)
             else:
                 self.subdataset_unvisited.append(roa_fname)
@@ -130,31 +133,29 @@ class ReplayManager:
         # Select the next replay file name from the unvisited subdataset
         if not self.subdataset_unvisited:
             return None
-        roa_fname = self.subdataset_unvisited[0]
+        self.roa_fname = self.subdataset_unvisited[0]
         # Delete any existing replay files from the replays folder
         for dirent in os.listdir(self.replays_apath):
             if dirent.endswith('.roa'):
                 dirent_apath = os.path.join(self.replays_apath, dirent)
                 os.remove(dirent_apath)
-        # Copy the next replay file into the replays folder
-        roa_apath = os.path.join(self.subdataset_apath, roa_fname)
-        shutil.copy(roa_apath, self.replays_apath)
-        # Mark the replay file as visited
-        self.subdataset_visited.append(roa_fname)
-        self.subdataset_unvisited.remove(roa_fname)
-        # Ensure the existence of a frames folder for the replay
-        roa_frames_dname = os.path.splitext(roa_fname)[0]
-        roa_frames_apath = os.path.join(frames_apath, roa_frames_dname)
-        if not os.path.isdir(roa_frames_apath):
-            os.mkdir(roa_frames_apath)
-        # Update state variables
-        self.roa_fname = roa_fname
-        self.roa_apath = roa_apath
-        self.roa_frames_dname = roa_frames_dname
-        self.roa_frames_apath = roa_frames_apath
-        # Return absolute path to the replay file
-        print('Fetching replay file "{}"'.format(roa_fname))
-        return roa_apath
+        # Copy this replay file into the replays folder
+        self.roa_apath = os.path.join(self.subdataset_apath, self.roa_fname)
+        shutil.copy(self.roa_apath, self.replays_apath)
+        # Mark this replay file as visited
+        self.subdataset_visited.append(self.roa_fname)
+        self.subdataset_unvisited.remove(self.roa_fname)
+        # Ensure the existence of a frames and labels folders for this replay
+        self.roa_dname = os.path.splitext(self.roa_fname)[0]
+        self.roa_frames_apath = os.path.join(self.frames_apath, self.roa_dname)
+        if not os.path.isdir(self.roa_frames_apath):
+            os.mkdir(self.roa_frames_apath)
+        self.roa_labels_apath = os.path.join(self.labels_apath, self.roa_dname)
+        if not os.path.isdir(self.roa_labels_apath):
+            os.mkdir(self.roa_labels_apath)
+        # Return absolute path to this replay file
+        print('Fetching replay file "{}"'.format(self.roa_fname))
+        return self.roa_apath
 
     def save_frame(self, frame, frame_offset):
         '''Purpose: Save a game frame
@@ -164,21 +165,25 @@ class ReplayManager:
         # Write the numpy array to a file in that folder
         fout_fname = str(frame_offset) + '.np'
         fout_apath = os.path.join(self.roa_frames_apath, fout_fname)
-        fout_rpath = os.path.join(self.roa_frames_dname, fout_fname)
+        fout_rpath = os.path.join(self.roa_dname, fout_fname)
         result = ''
         with open(fout_apath, 'wb') as fout:
             np.save(fout, frame)
             result = fout_rpath
         return result
 
-    def save_parsed_roa(self, roa_matrix):
+    def save_labels(self, roa_matrices):
+        '''Purpose: Save a set of labels
+        Pre: Subdataset loaded
+        Post: Saves a label as a NumPy pickle
+        '''
         result = []
-        for i,roa in enumerate(roa_matrix):
+        for i,roa_matrix in enumerate(roa_matrices):
             fout_fname = 'roa_' + str(i) + '.np'
-            fout_apath = os.path.join(self.roa_frames_apath, fout_fname)
-            fout_rpath = os.path.join(self.roa_frames_dname, fout_fname)
+            fout_apath = os.path.join(self.roa_labels_apath, fout_fname)
+            fout_rpath = os.path.join(self.roa_dname, fout_fname)
             with open(fout_apath, 'wb') as fout:
-                np.save(fout, roa)
+                np.save(fout, np.array(roa_matrix, dtype=object))
                 result.append(fout_rpath)
         return result
 
@@ -210,13 +215,20 @@ class ReplayManager:
                     break
         print('Deleted {} low contrast frames'.format(i))
 
-    def __are_frames_collected(self):
-        '''Check if a frames folder exists for the current roa'''
-        # Check if a folder exists in frames
-        if os.path.isdir(self.roa_frames_apath):
-            if len(os.listdir(self.roa_frames_apath) > 0:
-                return True
-        return False
+    def __is_collected(self, roa_fname):
+        '''Check if frames and labels exists for the current roa'''
+        roa_dname = os.path.splitext(roa_fname)[0]
+        frames = False
+        roa_frames_apath = os.path.join(self.frames_apath, roa_dname)
+        if os.path.isdir(roa_frames_apath):
+            if os.listdir(roa_frames_apath):
+                frames = True
+        labels = False
+        roa_labels_apath = os.path.join(self.labels_apath, roa_dname)
+        if os.path.isdir(roa_labels_apath):
+            if os.listdir(roa_labels_apath):
+                labels = True
+        return frames and labels
 
 
 class PlaybackTimer:
