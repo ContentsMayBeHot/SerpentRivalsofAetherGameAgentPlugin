@@ -65,8 +65,6 @@ class ReplayManager:
         self.config.read(config_apath)
         # Establish path to replays folder
         self.replays_apath = self.config['RivalsofAether']['PathToReplays']
-        # Initialize subdataset values to 'None'
-        self.__flush_subdataset()
         # Ensure frames folder exists
         self.frames_apath = os.path.join(self.replays_apath, 'frames')
         if not os.path.isdir(self.frames_apath):
@@ -98,22 +96,21 @@ class ReplayManager:
                 os.rename(dirent_apath, new_dirent_apath)
                 print('Sorted "{}" into "{}"'.format(dirent, version))
 
-    def load_subdataset(self, subdataset_dname=None):
+    def load_subdataset(self):
         '''Purpose: Load the subdataset for a particular game version
         Pre: Replays sorted into subdatasets
         Post: Subdataset loaded
         '''
-        # If no folder provided, choose the one for version specified in config
-        if not subdataset_dname:
-            subdataset_dname = self.get_current_version(as_dname=True)
-        self.subdataset_apath = os.path.join(self.replays_apath,
-                                               subdataset_dname)
-        # Load subdataset from folder
+        # Get the name of the subdataset from the configuration file
+        version = self.config['RivalsofAether']['GameVersion']
+        subdataset_dname = version_to_dname(version)
+        self.subdataset_apath = os.path.join(self.replays_apath, subdataset_dname)
+        # Load subdataset from its folder
         self.subdataset = [
             dirent for dirent in os.listdir(self.subdataset_apath)
             if dirent.endswith('.roa')
             ]
-        # Generate the unvisited set
+        # Initialize the unvisited set
         self.subdataset_unvisited = []
         self.subdataset_visited = []
         for roa_fname in self.subdataset:
@@ -125,81 +122,66 @@ class ReplayManager:
         print('Subdataset size:', len(self.subdataset))
         print('Unvisited size:', len(self.subdataset_unvisited))
 
-    def get_current_version(self, as_dname=False):
-        '''Purpose: Get the current game version as specified in the config file
-        Pre: Config file contains version
-        Post: Returns version string
-        '''
-        # Get in this format: x.y.z
-        version = self.config['RivalsofAether']['GameVersion']
-        if as_dname:
-            # Convert to the following format: xx_yy_zz (with leading 0s)
-            version = version_to_dname(version)
-        return version
-
-    def get_existing_subdatasets(self):
-        '''Purpose: Get a list of subdatasets
-        Pre: Replays sorted into subdatasets
-        Post: Returns list
-        '''
-        p = SUBDATASET_PATTERN
-        return [
-            dirent for dirent in os.listdir(self.replays_apath) if p.match(dirent)
-            ]
-
-    def get_roa_frames_directory(self):
-        # Get the name of the current replay file
-        roa_fname = self.__detect_roa()
-        if not roa_fname:
-            return ''
-        # Derive frames directory name from replay file name
-        roa_frames_dname = os.path.splitext(roa_fname)[0]
-        # Concatenate with frames master folder absolute path
-        return os.path.join(self.frames_apath, roa_frames_dname)
-
-    def next_roa(self, apath=False):
+    def next_roa(self):
         '''Purpose: Get a new roa file
         Pre: Subdataset loaded
         Post: Replaces current replay with an unvisited one and marks as visited
         '''
-        # Get the next .roa from the unvisited list
+        # Select the next replay file name from the unvisited subdataset
         if not self.subdataset_unvisited:
             return None
         roa_fname = self.subdataset_unvisited[0]
-
-        # Replace current .roas with the next .roa and mark latter as visited
-        self.__flush_replays()
-        self.__transfer_roa(roa_fname)
-        self.__visit_roa(roa_fname)
-        self.__ensure_frames_dir(roa_fname)
-
+        # Delete any existing replay files from the replays folder
+        for dirent in os.listdir(self.replays_apath):
+            if dirent.endswith('.roa'):
+                dirent_apath = os.path.join(self.replays_apath, dirent)
+                os.remove(dirent_apath)
+        # Copy the next replay file into the replays folder
+        roa_apath = os.path.join(self.subdataset_apath, roa_fname)
+        shutil.copy(roa_apath, self.replays_apath)
+        # Mark the replay file as visited
+        self.subdataset_visited.append(roa_fname)
+        self.subdataset_unvisited.remove(roa_fname)
+        # Ensure the existence of a frames folder for the replay
+        roa_frames_dname = os.path.splitext(roa_fname)[0]
+        roa_frames_apath = os.path.join(frames_apath, roa_frames_dname)
+        if not os.path.isdir(roa_frames_apath):
+            os.mkdir(roa_frames_apath)
+        # Update state variables
+        self.roa_fname = roa_fname
+        self.roa_apath = roa_apath
+        self.roa_frames_dname = roa_frames_dname
+        self.roa_frames_apath = roa_frames_apath
+        # Return absolute path to the replay file
         print('Fetching replay file "{}"'.format(roa_fname))
-        if apath:
-            return os.path.join(self.replays_apath, roa_fname)
-        return roa_fname
+        return roa_apath
 
-    def save_frame(self, frame, frame_offset, return_apath=False):
+    def save_frame(self, frame, frame_offset):
         '''Purpose: Save a game frame
         Pre: Subdataset loaded
         Post: Saves game frame as NumPy pickle
         '''
-        # Get the name of the current replay file
-        roa_fname = self.__detect_roa()
-        if not roa_fname:
-            return ''
-
         # Write the numpy array to a file in that folder
         fout_fname = str(frame_offset) + '.np'
-        fout_apath = os.path.join(roa_frames_apath, fout_fname)
+        fout_apath = os.path.join(self.roa_frames_apath, fout_fname)
+        fout_rpath = os.path.join(self.roa_frames_dname, fout_fname)
         result = ''
         with open(fout_apath, 'wb') as fout:
             np.save(fout, frame)
-            fout_rpath = os.path.join(roa_frames_dname, fout_fname)
             result = fout_rpath
         return result
 
-    def save_parsed_roa(self, roa_nparrs):
-        roa_frames_apath = self.get_roa_frames_directory()
+    def save_parsed_roa(self, roa_matrix):
+        result = []
+        for i,roa in enumerate(roa_matrix):
+            fout_fname = 'roa_' + str(i) + '.np'
+            fout_apath = os.path.join(self.roa_frames_apath, fout_fname)
+            fout_rpath = os.path.join(self.roa_frames_dname, fout_fname)
+            with open(fout_apath, 'wb') as fout:
+                np.save(fout, roa)
+                result.append(fout_rpath)
+        return result
+
 
     def cull_low_contrast(self):
         '''Purpose: Delete all frames with low contrast
@@ -209,10 +191,8 @@ class ReplayManager:
         i = 0
         for roa_fname in self.subdataset_visited:
             # Get a list of all of the frame dump files
-            roa_frames_dname = os.path.splitext(roa_fname)[0]
-            roa_frames_apath = os.path.join(self.frames_apath, roa_frames_dname)
             roa_frames = [
-                dirent for dirent in os.listdir(roa_frames_apath)
+                dirent for dirent in os.listdir(self.roa_frames_apath)
                 if dirent.endswith('.np')
                 ]
             # Sort by frame index in descending order
@@ -221,7 +201,7 @@ class ReplayManager:
                                 reverse=True)
             # Cull until low contrast images are gone
             for frame_fname in roa_frames:
-                frame_apath = os.path.join(roa_frames_apath, frame_fname)
+                frame_apath = os.path.join(self.roa_frames_apath, frame_fname)
                 frame = np.load(frame_apath)
                 if skimage.exposure.is_low_contrast(frame):
                     os.remove(frame_apath)
@@ -230,57 +210,13 @@ class ReplayManager:
                     break
         print('Deleted {} low contrast frames'.format(i))
 
-    def __ensure_frames_dir(self, roa_fname):
-        # Ensure existence of folder for this replay file's frames
-        roa_frames_dname = os.path.splitext(roa_fname)[0]
-        roa_frames_apath = os.path.join(self.frames_apath, roa_frames_dname)
-        if not os.path.isdir(roa_frames_apath):
-            os.mkdir(roa_frames_apath)
-        return roa_frames_apath
-
-    def __are_frames_collected(self, roa_fname):
+    def __are_frames_collected(self):
         '''Check if a frames folder exists for the current roa'''
         # Check if a folder exists in frames
-        roa_frames_dname = os.path.splitext(roa_fname)[0]
-        roa_frames_apath = os.path.join(self.frames_apath, roa_frames_dname)
-        if os.path.isdir(roa_frames_apath):
-            return True
+        if os.path.isdir(self.roa_frames_apath):
+            if len(os.listdir(self.roa_frames_apath) > 0:
+                return True
         return False
-
-    def __detect_roa(self):
-        '''Check if there is an roa in the replays folder and return its name'''
-        return [
-            dirent for dirent in os.listdir(self.replays_apath)
-            if dirent.endswith('.roa')
-            ][0]
-
-    def __flush_subdataset(self):
-        '''Reset subdataset to starting values'''
-        self.subdataset_apath = None
-        self.subdataset = None
-        self.subdataset_unvisited = None
-        self.subdataset_visited = None
-
-    def __flush_replays(self):
-        ''' Remove all roa files from the replays folder'''
-        # Get contents of replays folder
-        for dirent in os.listdir(self.replays_apath):
-            # Check for .roa extension
-            if dirent.endswith('.roa'):
-                # Delete the .roa file
-                dirent_apath = os.path.join(self.replays_apath, dirent)
-                os.remove(dirent_apath)
-
-    def __transfer_roa(self, roa_fname):
-        '''Copy specified roa file from subdataset folder to replays folder'''
-        # Copy the specified replay file to the game's replays folder
-        roa_apath = os.path.join(self.subdataset_apath, roa_fname)
-        shutil.copy(roa_apath, self.replays_apath)
-
-    def __visit_roa(self, roa_fname):
-        '''Mark specified roa file as visited'''
-        self.subdataset_visited.append(roa_fname)
-        self.subdataset_unvisited.remove(roa_fname)
 
 
 class PlaybackTimer:
