@@ -6,6 +6,8 @@ from serpent.input_controller import KeyboardKey
 
 from .helpers.replaymanager import ReplayManager, PlaybackTimer, Game
 from .helpers.parser.roaparser import Replay, Player
+# import helpers.replaymanager as replaymanager
+# import helpers.parser.roaparser as replayparser
 
 import datetime
 import time
