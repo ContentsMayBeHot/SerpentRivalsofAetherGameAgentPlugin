@@ -12,6 +12,10 @@ import skimage.exposure
 import numpy as np
 
 
+#TODO: Rename subdataset to version_subset
+#TODO: Create subset class
+
+
 def main():
     args = sys.argv
     if len(args) != 2:
