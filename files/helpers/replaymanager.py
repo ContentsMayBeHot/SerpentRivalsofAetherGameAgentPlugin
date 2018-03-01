@@ -22,7 +22,9 @@ def main():
     if cmd == 'sort':
         manager.sort_roas_into_subdatasets()
     elif cmd == 'sample':
-        manager.make_random_sample()
+        manager.make_ml_sets()
+    elif cmd == 'test-sample':
+        manager.make_random_test_sample()
 
 def version_to_dname(string):
     '''Convert x.x.x to xx_xx_xx'''
@@ -107,15 +109,29 @@ class ReplayManager:
                 os.rename(dirent_apath, new_dirent_apath)
                 print('Sorted "{}" into "{}"'.format(dirent, version))
 
-    def make_random_sample(self):
+    def make_random_test_sample(self):
         dataset = [
             dirent for dirent in os.listdir(self.frames_apath)
             if os.path.isdir(os.path.join(self.frames_apath, dirent))
             ]
         random = np.random.choice(dataset, 10, replace=False)
-        # TODO: Probability distribution (e.g. 80,20) and subset sizes
         return random
 
+    def make_ml_sets(self):
+        dataset = [
+            dirent for dirent in os.listdir(self.frames_apath)
+            if os.path.isdir(os.path.join(self.frames_apath, dirent))
+            ]
+        training_set = []
+        testing_set = []
+        random = np.random.choice([True, False], len(dataset), p=[0.80, 0.20])
+        for x,r in zip(dataset, random):
+            if r:
+                training_set.append(r)
+            else:
+                testing_set.append(r)
+        print(len(training_set))
+        print(len(testing_set))
 
     def load_subdataset(self):
         '''Purpose: Load the subdataset for a particular game version
