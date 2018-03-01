@@ -110,6 +110,7 @@ class ReplayManager:
                 print('Sorted "{}" into "{}"'.format(dirent, version))
 
     def make_random_test_sample(self):
+        # TODO: define location in file system for copying test sample
         dataset = [
             dirent for dirent in os.listdir(self.frames_apath)
             if os.path.isdir(os.path.join(self.frames_apath, dirent))
@@ -118,6 +119,7 @@ class ReplayManager:
         return random
 
     def make_ml_sets(self):
+        # TODO: define location in file system for copying sets
         dataset = [
             dirent for dirent in os.listdir(self.frames_apath)
             if os.path.isdir(os.path.join(self.frames_apath, dirent))
