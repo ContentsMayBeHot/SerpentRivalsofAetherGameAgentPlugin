@@ -13,9 +13,16 @@ import numpy as np
 
 
 def main():
-    '''Sort replays by version'''
+    args = sys.argv
+    if len(args) != 2:
+        sys.exit()
+    cmd = args[1].lower()
+
     manager = ReplayManager()
-    manager.sort_roas_into_subdatasets()
+    if cmd == 'sort':
+        manager.sort_roas_into_subdatasets()
+    elif cmd == 'sample':
+        manager.make_random_sample()
 
 def version_to_dname(string):
     '''Convert x.x.x to xx_xx_xx'''
@@ -35,6 +42,7 @@ def dname_to_version(string):
 class Game:
     FRAMES_PER_SECOND = 60.0
     SUBDATASET_PATTERN = re.compile('[0-9]{2}_[0-9]{2}_[0-9]{2}')
+    ROA_PATTERN = re.compile('[0-9]{4}-[0-9]{2}-[0-9]{2}-[0-9]{12}')
 
     class State(enum.Enum):
         SPLASH_SCREEN = enum.auto()
@@ -98,6 +106,16 @@ class ReplayManager:
                 new_dirent_apath = os.path.join(subdataset_apath, dirent)
                 os.rename(dirent_apath, new_dirent_apath)
                 print('Sorted "{}" into "{}"'.format(dirent, version))
+
+    def make_random_sample(self):
+        dataset = [
+            dirent for dirent in os.listdir(self.frames_apath)
+            if os.path.isdir(os.path.join(self.frames_apath, dirent))
+            ]
+        random = np.random.choice(dataset, 10, replace=False)
+        # TODO: Probability distribution (e.g. 80,20) and subset sizes
+        return random
+
 
     def load_subdataset(self):
         '''Purpose: Load the subdataset for a particular game version
