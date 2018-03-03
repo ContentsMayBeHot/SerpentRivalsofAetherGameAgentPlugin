@@ -86,15 +86,15 @@ class ReplayManager:
         config_dname = os.path.abspath(os.path.dirname(__file__))
         config_apath = os.path.join(config_dname, 'roa.ini')
         self.config.read(config_apath)
-        # Establish path to replays folder
+        # Establish data paths
         self.replays_apath = self.config['RivalsofAether']['PathToReplays']
-        # Ensure frames and labels folder exists
         self.frames_apath = os.path.join(self.replays_apath, 'frames')
-        if not os.path.isdir(self.frames_apath):
-            os.mkdir(self.frames_apath)
+        self.sets_path = os.path.join(self.replays_apath, 'sets')
         self.labels_apath = os.path.join(self.replays_apath, 'labels')
-        if not os.path.isdir(self.labels_apath):
-            os.mkdir(self.labels_apath)
+        # Ensure data paths exist
+        self.__ensure_directory_exists__(self.frames_apath)
+        self.__ensure_directory_exists__(self.labels_apath)
+        self.__ensure_directory_exists__(self.sets_path)
 
     def sort_roas_into_subdatasets(self):
         '''Purpose: Sort .roa files by version into subdatasets
@@ -124,30 +124,23 @@ class ReplayManager:
 
     def make_random_test_sample(self):
         # Ensure directory for random sample
-        random_apath = os.path.join(self.replays_apath, 'random_set')
-        if not os.path.isdir(random_apath):
-            os.mkdir(random_apath)
+        random_set_apath = os.path.join(self.sets_path, 'random')
+        self.__ensure_directory_exists__(random_set_apath)
         # Create random subset
         dataset = [
             dirent for dirent in os.listdir(self.frames_apath)
             if os.path.isdir(os.path.join(self.frames_apath, dirent))
             ]
-        random = np.random.choice(dataset, 10, replace=False)
-        # Copy each random entry
-        for roa_dname in random:
-            print('Copying', roa_dname, 'to random subset')
-            roa_random_apath = os.path.join(random_apath, roa_dname)
-            if not os.path.isdir(roa_random_apath):
-                os.mkdir(roa_random_apath)
-            frames_src = os.path.join(self.frames_apath, roa_dname)
-            frames_dst = os.path.join(roa_random_apath, 'frames')
-            shutil.copytree(frames_src, frames_dst, symlinks=False, ignore=None)
-            labels_src = os.path.join(self.labels_apath, roa_dname)
-            labels_dst = os.path.join(roa_random_apath, 'labels')
-            shutil.copytree(labels_src, labels_dst, symlinks=False, ignore=None)
+        random_batch = np.random.choice(dataset, 10, replace=False)
+        self.__copy_batch_into_set__(random_batch, random_set_apath)
 
     def make_ml_sets(self):
-        # TODO: define location in file system for copying sets
+        # Ensure directories for training and testing sets
+        training_set_apath = os.path.join(self.sets_path, 'training')
+        testing_set_apath = os.path.join(self.sets_path, 'testing')
+        self.__ensure_directory_exists__(training_set_apath)
+        self.__ensure_directory_exists__(testing_set_apath)
+        # Establish training and testing sets with probability distribution
         dataset = [
             dirent for dirent in os.listdir(self.frames_apath)
             if os.path.isdir(os.path.join(self.frames_apath, dirent))
@@ -160,8 +153,24 @@ class ReplayManager:
                 training_set.append(r)
             else:
                 testing_set.append(r)
-        print(len(training_set))
-        print(len(testing_set))
+        self.__copy_batch_into_set__(training_set, training_set_apath)
+        self.__copy_batch_into_set__(testing_set, testing_set_apath)
+
+
+    def __ensure_directory_exists__(self, apath):
+        if not os.path.isdir(apath):
+            os.mkdir(apath)
+
+    def __copy_batch_into_set__(self, batch, dst_root):
+        for roa_dname in batch:
+            # Copy frames
+            frames_src = os.path.join(self.frames_apath, roa_dname)
+            frames_dst = os.path.join(dst_root, 'frames', roa_dname)
+            shutil.copytree(frames_src, frames_dst, symlinks=False, ignore=None)
+            # Copy labels
+            labels_src = os.path.join(self.labels_apath, roa_dname)
+            labels_dst = os.path.join(dst_root, 'labels', roa_dname)
+            shutil.copytree(labels_src, labels_dst, symlinks=False, ignore=None)
 
     def load_subdataset(self):
         '''Purpose: Load the subdataset for a particular game version
@@ -181,7 +190,7 @@ class ReplayManager:
         self.subdataset_unvisited = []
         self.subdataset_visited = []
         for roa_fname in self.subdataset:
-            if self.__is_collected(roa_fname):
+            if self.__is_collected__(roa_fname):
                 self.subdataset_visited.append(roa_fname)
             else:
                 self.subdataset_unvisited.append(roa_fname)
@@ -212,11 +221,9 @@ class ReplayManager:
         # Ensure the existence of a frames and labels folders for this replay
         self.roa_dname = os.path.splitext(self.roa_fname)[0]
         self.roa_frames_apath = os.path.join(self.frames_apath, self.roa_dname)
-        if not os.path.isdir(self.roa_frames_apath):
-            os.mkdir(self.roa_frames_apath)
+        self.__ensure_directory_exists__(self.roa_frames_apath)
         self.roa_labels_apath = os.path.join(self.labels_apath, self.roa_dname)
-        if not os.path.isdir(self.roa_labels_apath):
-            os.mkdir(self.roa_labels_apath)
+        self.__ensure_directory_exists__(self.roa_labels_apath)
         # Return absolute path to this replay file
         print('Fetching replay file "{}"'.format(self.roa_fname))
         return self.roa_apath
@@ -279,7 +286,7 @@ class ReplayManager:
                     break
         print('Deleted {} low contrast frames'.format(i))
 
-    def __is_collected(self, roa_fname):
+    def __is_collected__(self, roa_fname):
         '''Check if frames and labels exists for the current roa'''
         roa_dname = os.path.splitext(roa_fname)[0]
         frames = False
