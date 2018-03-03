@@ -122,7 +122,7 @@ class ReplayManager:
                 os.rename(dirent_apath, new_dirent_apath)
                 print('Sorted "{}" into "{}"'.format(dirent, version))
 
-    def make_random_test_sample(self):
+    def make_random_test_sample(self, sample_size=10):
         # Ensure directory for random sample
         random_set_apath = os.path.join(self.sets_path, 'random')
         self.__ensure_directory_exists__(random_set_apath)
@@ -131,7 +131,7 @@ class ReplayManager:
             dirent for dirent in os.listdir(self.frames_apath)
             if os.path.isdir(os.path.join(self.frames_apath, dirent))
             ]
-        random_batch = np.random.choice(dataset, 10, replace=False)
+        random_batch = np.random.choice(dataset, sample_size, replace=False)
         self.__copy_batch_into_set__(random_batch, random_set_apath)
 
     def make_ml_sets(self):
