@@ -19,6 +19,7 @@ import numpy as np
 def main():
     args = sys.argv
     if len(args) != 2:
+        print_help()
         sys.exit()
     cmd = args[1].lower()
 
@@ -29,6 +30,14 @@ def main():
         manager.make_ml_sets()
     elif cmd == 'test-sample':
         manager.make_random_test_sample()
+    else:
+        print_help()
+
+def print_help():
+    print('Rivals of Aether Replay Manager:')
+    print(' SORT        - Sort replay files by game version')
+    print(' SAMPLE      - Create training and testing sets')
+    print(' TEST-SAMPLE - Create random sample for validation')
 
 def version_to_dname(string):
     '''Convert x.x.x to xx_xx_xx'''
@@ -114,13 +123,28 @@ class ReplayManager:
                 print('Sorted "{}" into "{}"'.format(dirent, version))
 
     def make_random_test_sample(self):
-        # TODO: define location in file system for copying test sample
+        # Ensure directory for random sample
+        random_apath = os.path.join(self.replays_apath, 'random_set')
+        if not os.path.isdir(random_apath):
+            os.mkdir(random_apath)
+        # Create random subset
         dataset = [
             dirent for dirent in os.listdir(self.frames_apath)
             if os.path.isdir(os.path.join(self.frames_apath, dirent))
             ]
         random = np.random.choice(dataset, 10, replace=False)
-        return random
+        # Copy each random entry
+        for roa_dname in random:
+            print('Copying', roa_dname, 'to random subset')
+            roa_random_apath = os.path.join(random_apath, roa_dname)
+            if not os.path.isdir(roa_random_apath):
+                os.mkdir(roa_random_apath)
+            frames_src = os.path.join(self.frames_apath, roa_dname)
+            frames_dst = os.path.join(roa_random_apath, 'frames')
+            shutil.copytree(frames_src, frames_dst, symlinks=False, ignore=None)
+            labels_src = os.path.join(self.labels_apath, roa_dname)
+            labels_dst = os.path.join(roa_random_apath, 'labels')
+            shutil.copytree(labels_src, labels_dst, symlinks=False, ignore=None)
 
     def make_ml_sets(self):
         # TODO: define location in file system for copying sets
