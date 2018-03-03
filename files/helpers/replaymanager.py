@@ -162,14 +162,18 @@ class ReplayManager:
             os.mkdir(apath)
 
     def __copy_batch_into_set__(self, batch, dst_root):
-        for roa_dname in batch:
-            # Copy frames
+        n = len(batch)
+        for i,roa_dname in enumerate(batch):
+            print('Copying', roa_dname, 'into set [{}/{}]'.format(i+1,n))
+            # Establish paths
             frames_src = os.path.join(self.frames_apath, roa_dname)
             frames_dst = os.path.join(dst_root, 'frames', roa_dname)
-            shutil.copytree(frames_src, frames_dst, symlinks=False, ignore=None)
-            # Copy labels
             labels_src = os.path.join(self.labels_apath, roa_dname)
             labels_dst = os.path.join(dst_root, 'labels', roa_dname)
+            if os.path.isdir(frames_dst) or os.path.isdir(labels_dst):
+                continue
+            # Copy
+            shutil.copytree(frames_src, frames_dst, symlinks=False, ignore=None)
             shutil.copytree(labels_src, labels_dst, symlinks=False, ignore=None)
 
     def load_subdataset(self):
