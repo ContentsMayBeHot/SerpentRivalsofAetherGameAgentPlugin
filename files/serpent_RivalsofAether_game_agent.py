@@ -77,7 +77,8 @@ class SerpentRivalsofAetherGameAgent(GameAgent):
             roa_apath = self.manager.next_roa()
             # Case 1-exception: No replays left
             if not roa_apath:
-                print('^w^ ~ Done collecting')
+                total = len(self.manager.subdataset)
+                print('^w^ ~ Done collecting for {} replays'.format(total))
                 sys.exit()
             self.roa = Replay(roa_apath)
             duration = self.roa.get_duration()
@@ -106,7 +107,11 @@ class SerpentRivalsofAetherGameAgent(GameAgent):
                 print(printout)
             # State 2-B: Playback end
             else:
-                print('uwu ~ Finished watching ')
+                printout = 'uwu ~ Finished watching'
+                visited = len(self.manager.subdataset_visited)
+                unvisited = len(self.manager.subdataset_unvisited)
+                printout += '\t{}:{}'.format(visited, unvisited)
+                print(printout)
                 roa_matrices = [
                     p.collapse_actions() for p in self.roa.players
                     ]
