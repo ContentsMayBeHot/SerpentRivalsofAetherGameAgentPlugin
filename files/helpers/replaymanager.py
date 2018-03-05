@@ -75,7 +75,7 @@ class Game:
         main_to_replay = [0.5, 'DOWN', 'DOWN', 'DOWN', 'Z', 1, 'Z']
         start_replay_1 = [1, 'Z', 'Z', 0]
         back_and_forth = [1, 'X', 'Z']
-        end_postreplay = [1, 5, 'Z', 'Z', 2]
+        end_postreplay = [2, 6, 'Z', 'Z', 3]
 
 
 class ReplayManager:
