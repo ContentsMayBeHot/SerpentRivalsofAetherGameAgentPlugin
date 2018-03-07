@@ -4,14 +4,13 @@ from serpent.input_controller import KeyboardKey
 from serpent.frame_grabber import FrameGrabber
 from serpent.input_controller import KeyboardKey
 
-from .helpers.replaymanager import ReplayManager, PlaybackTimer, Game
-from .helpers.parser.roaparser import Replay, Player
-# import helpers.replaymanager as replaymanager
-# import helpers.parser.roaparser as replayparser
+import helpers.manager.replaymanager as replaymanager
+import helpers.parser.roaparser as roaparser
 
 import datetime
 import time
 import sys
+
 
 class SerpentRivalsofAetherGameAgent(GameAgent):
     def __init__(self, **kwargs):
@@ -56,9 +55,9 @@ class SerpentRivalsofAetherGameAgent(GameAgent):
         '''Perform setup for frame collection'''
         self.setup_common()
 
-        self.manager = ReplayManager()
+        self.manager = replaymanagerReplayManager()
         self.manager.load_subdataset()
-        self.playback = PlaybackTimer()
+        self.playback = replaymanagerPlaybackTimer()
 
         self.game_state = Game.State.REPLAY_MENU
 
@@ -80,7 +79,7 @@ class SerpentRivalsofAetherGameAgent(GameAgent):
                 total = len(self.manager.subdataset)
                 print('^w^ ~ Done collecting for {} replays'.format(total))
                 sys.exit()
-            self.roa = Replay(roa_apath)
+            self.roa = roaparserReplay(roa_apath)
             duration = self.roa.get_duration()
             self.tap_sequence(Game.Sequence.back_and_forth)
             self.tap_sequence(Game.Sequence.start_replay_1)
@@ -144,3 +143,24 @@ class SerpentRivalsofAetherGameAgent(GameAgent):
                 token = int(token)
                 if token > 0:
                     time.sleep(token)
+
+
+class Game:
+    FRAMES_PER_SECOND = 60.0
+    class State(enum.Enum):
+        SPLASH_SCREEN = enum.auto()
+        MAIN_MENU = enum.auto()
+        REPLAY_MENU = enum.auto()
+        REPLAY_PLAYBACK = enum.auto()
+        CHARACTER_SELECTION = enum.auto()
+        STAGE_SELECTION = enum.auto()
+        GAMEPLAY = enum.auto()
+
+    class Sequence:
+        '''The first element is the default delay between key presses, and all
+        subsequent elements are either key names or timed delays.'''
+        splash_to_main = [1.5, 'Z', 'X', 'Z', 'Z', 'Z', 'Z']
+        main_to_replay = [0.5, 'DOWN', 'DOWN', 'DOWN', 'Z', 1, 'Z']
+        start_replay_1 = [1, 'Z', 'Z', 0]
+        back_and_forth = [1, 'X', 'Z']
+        end_postreplay = [2, 6, 'Z', 'Z', 3]

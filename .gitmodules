@@ -1,3 +1,6 @@
 [submodule "files/helpers/RivalsofAetherReplayParser"]
 	path = files/helpers/parser
 	url = https://github.com/ContentsMayBeHot/RivalsofAetherReplayParser
+[submodule "RivalsofAetherReplayManager"]
+	path = files/helpers/manager
+	url = https://github.com/ContentsMayBeHot/RivalsofAetherReplayManager
