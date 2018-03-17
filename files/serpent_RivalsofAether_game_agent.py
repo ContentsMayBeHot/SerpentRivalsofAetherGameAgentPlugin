@@ -4,10 +4,14 @@ from serpent.input_controller import KeyboardKey
 from serpent.frame_grabber import FrameGrabber
 from serpent.input_controller import KeyboardKey
 
-import helpers.manager.replaymanager as replaymanager
-import helpers.parser.roaparser as roaparser
+from .helpers.manager.replaymanager import ReplayManager, PlaybackTimer
+from .helpers.parser.roaparser import Replay
 
+import enum
 import datetime
+import keras
+import numpy as np
+import os
 import time
 import sys
 
@@ -49,15 +53,21 @@ class SerpentRivalsofAetherGameAgent(GameAgent):
     def setup_play(self):
         '''Perform setup for play'''
         self.setup_common()
-        # TODO Additional setup
+        # Turn off CPU feature warnings
+        os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+        # Load ML model
+        model_path = os.path.join('plugins',
+                                  'SerpentRivalsofAetherGameAgentPlugin',
+                                  'files', 'ml_models', 'rival.h5')
+        self.model = keras.models.load_model(model_path)
 
     def setup_collect(self):
         '''Perform setup for frame collection'''
         self.setup_common()
 
-        self.manager = replaymanagerReplayManager()
+        self.manager = ReplayManager()
         self.manager.load_subdataset()
-        self.playback = replaymanagerPlaybackTimer()
+        self.playback = PlaybackTimer()
 
         self.game_state = Game.State.REPLAY_MENU
 
@@ -65,7 +75,10 @@ class SerpentRivalsofAetherGameAgent(GameAgent):
         '''Frame handler for play mode. To invoke, run:
         serpent play RivalsofAether SerpentRivalsofAetherGameAgent PLAY
         '''
-        pass # TODO this
+        x = np.array([game_frame.quarter_resolution_frame])
+        print(x.shape)
+        prediction = self.model.predict(x)
+        print(prediction)
 
     def handle_collect(self, game_frame):
         '''Frame handler for frame collection mode. To invoke, run:
@@ -79,7 +92,7 @@ class SerpentRivalsofAetherGameAgent(GameAgent):
                 total = len(self.manager.subdataset)
                 print('^w^ ~ Done collecting for {} replays'.format(total))
                 sys.exit()
-            self.roa = roaparserReplay(roa_apath)
+            self.roa = Replay(roa_apath)
             duration = self.roa.get_duration()
             self.tap_sequence(Game.Sequence.back_and_forth)
             self.tap_sequence(Game.Sequence.start_replay_1)
