@@ -4,14 +4,17 @@ from serpent.input_controller import KeyboardKey
 from serpent.frame_grabber import FrameGrabber
 from serpent.input_controller import KeyboardKey
 
-from .helpers.replaymanager import ReplayManager, PlaybackTimer, Game
-from .helpers.parser.roaparser import Replay, Player
-# import helpers.replaymanager as replaymanager
-# import helpers.parser.roaparser as replayparser
+from .helpers.manager.replaymanager import ReplayManager, PlaybackTimer
+from .helpers.parser.roaparser import Replay
 
+import enum
 import datetime
+import keras
+import numpy as np
+import os
 import time
 import sys
+
 
 class SerpentRivalsofAetherGameAgent(GameAgent):
     def __init__(self, **kwargs):
@@ -50,7 +53,13 @@ class SerpentRivalsofAetherGameAgent(GameAgent):
     def setup_play(self):
         '''Perform setup for play'''
         self.setup_common()
-        # TODO Additional setup
+        # Turn off CPU feature warnings
+        os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+        # Load ML model
+        model_path = os.path.join('plugins',
+                                  'SerpentRivalsofAetherGameAgentPlugin',
+                                  'files', 'ml_models', 'rival.h5')
+        self.model = keras.models.load_model(model_path)
 
     def setup_collect(self):
         '''Perform setup for frame collection'''
@@ -66,7 +75,10 @@ class SerpentRivalsofAetherGameAgent(GameAgent):
         '''Frame handler for play mode. To invoke, run:
         serpent play RivalsofAether SerpentRivalsofAetherGameAgent PLAY
         '''
-        pass # TODO this
+        x = np.array([game_frame.quarter_resolution_frame])
+        print(x.shape)
+        prediction = self.model.predict(x)
+        print(prediction)
 
     def handle_collect(self, game_frame):
         '''Frame handler for frame collection mode. To invoke, run:
@@ -77,7 +89,8 @@ class SerpentRivalsofAetherGameAgent(GameAgent):
             roa_apath = self.manager.next_roa()
             # Case 1-exception: No replays left
             if not roa_apath:
-                print('^w^ ~ Done collecting')
+                total = len(self.manager.subdataset)
+                print('^w^ ~ Done collecting for {} replays'.format(total))
                 sys.exit()
             self.roa = Replay(roa_apath)
             duration = self.roa.get_duration()
@@ -106,7 +119,11 @@ class SerpentRivalsofAetherGameAgent(GameAgent):
                 print(printout)
             # State 2-B: Playback end
             else:
-                print('uwu ~ Finished watching ')
+                printout = 'uwu ~ Finished watching'
+                visited = len(self.manager.subdataset_visited)
+                unvisited = len(self.manager.subdataset_unvisited)
+                printout += '\t{}:{}'.format(visited, unvisited)
+                print(printout)
                 roa_matrices = [
                     p.collapse_actions() for p in self.roa.players
                     ]
@@ -139,3 +156,24 @@ class SerpentRivalsofAetherGameAgent(GameAgent):
                 token = int(token)
                 if token > 0:
                     time.sleep(token)
+
+
+class Game:
+    FRAMES_PER_SECOND = 60.0
+    class State(enum.Enum):
+        SPLASH_SCREEN = enum.auto()
+        MAIN_MENU = enum.auto()
+        REPLAY_MENU = enum.auto()
+        REPLAY_PLAYBACK = enum.auto()
+        CHARACTER_SELECTION = enum.auto()
+        STAGE_SELECTION = enum.auto()
+        GAMEPLAY = enum.auto()
+
+    class Sequence:
+        '''The first element is the default delay between key presses, and all
+        subsequent elements are either key names or timed delays.'''
+        splash_to_main = [1.5, 'Z', 'X', 'Z', 'Z', 'Z', 'Z']
+        main_to_replay = [0.5, 'DOWN', 'DOWN', 'DOWN', 'Z', 1, 'Z']
+        start_replay_1 = [1, 'Z', 'Z', 0]
+        back_and_forth = [1, 'X', 'Z']
+        end_postreplay = [2, 6, 'Z', 'Z', 3]
