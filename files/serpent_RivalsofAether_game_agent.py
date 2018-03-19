@@ -10,6 +10,7 @@ from .helpers.parser.roaparser import Replay
 import enum
 import datetime
 import keras
+import matplotlib.pyplot as plt
 import numpy as np
 import os
 import time
@@ -67,9 +68,9 @@ class SerpentRivalsofAetherGameAgent(GameAgent):
         model_path = os.path.join('plugins',
                                   'SerpentRivalsofAetherGameAgentPlugin',
                                   'files', 'ml_models', 'rival.h5')
-        print('Loading model')
+        print('Loading model.')
         self.model = keras.models.load_model(model_path)
-        print('Model loaded')
+        print(self.model.summary())
 
     def setup_collect(self):
         '''Perform setup for frame collection'''
@@ -88,13 +89,16 @@ class SerpentRivalsofAetherGameAgent(GameAgent):
         x = np.array([game_frame.quarter_resolution_frame])
         # https://stackoverflow.com/a/12201744
         x = np.dot(x[...,:3], [0.299, 0.587, 0.114])
+
+        # Make prediction
         y = self.model.predict(x, batch_size=1)
         y = y.tolist()[0]
-        actions = [ 'L', 'R', 'U', 'D', 'ATK', 'SPC', 'JMP', 'DGD', 'STR' ]
 
+        # Display labels
+        actnames = [ 'L', 'R', 'U', 'D', 'ATK', 'SPC', 'JMP', 'DGD', 'STR' ]
         printout = ''
-        for a,v in zip(actions, y):
-            printout += a + ': ' + str(v) + '\t'
+        for a,v in zip(actnames, y):
+            printout += a + ': {0:.3f}'.format(v) + '\t'
         print(printout)
 
         if (y[Classes.LEFT.value] >= THRESHOLD
