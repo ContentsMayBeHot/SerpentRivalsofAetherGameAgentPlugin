@@ -4,14 +4,20 @@ from serpent.input_controller import KeyboardKey
 from serpent.frame_grabber import FrameGrabber
 from serpent.input_controller import KeyboardKey
 
-from .helpers.replaymanager import ReplayManager, PlaybackTimer, Game
-from .helpers.parser.roaparser import Replay, Player
-# import helpers.replaymanager as replaymanager
-# import helpers.parser.roaparser as replayparser
+from .helpers.manager.replaymanager import ReplayManager, PlaybackTimer
+from .helpers.parser.roaparser import Replay
 
+import enum
 import datetime
+import keras
+import numpy as np
+import os
 import time
 import sys
+
+
+THRESHOLD = 0.09
+
 
 class SerpentRivalsofAetherGameAgent(GameAgent):
     def __init__(self, **kwargs):
@@ -26,10 +32,15 @@ class SerpentRivalsofAetherGameAgent(GameAgent):
         '''Perform setup for both play and frame collection'''
         self.input_mapping = {
             'Z': KeyboardKey.KEY_Z,
+            'JUMP': KeyboardKey.KEY_Z,
             'X': KeyboardKey.KEY_X,
+            'ATTACK': KeyboardKey.KEY_X,
             'C': KeyboardKey.KEY_C,
+            'SPECIAL': KeyboardKey.KEY_C,
             'D': KeyboardKey.KEY_D,
+            'STRONG': KeyboardKey.KEY_D,
             'S': KeyboardKey.KEY_S,
+            'DODGE': KeyboardKey.KEY_S,
             'UP': KeyboardKey.KEY_UP,
             'DOWN': KeyboardKey.KEY_DOWN,
             'LEFT': KeyboardKey.KEY_LEFT,
@@ -50,7 +61,15 @@ class SerpentRivalsofAetherGameAgent(GameAgent):
     def setup_play(self):
         '''Perform setup for play'''
         self.setup_common()
-        # TODO Additional setup
+        # Turn off CPU feature warnings
+        os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+        # Load ML model
+        model_path = os.path.join('plugins',
+                                  'SerpentRivalsofAetherGameAgentPlugin',
+                                  'files', 'ml_models', 'rival.h5')
+        print('Loading model')
+        self.model = keras.models.load_model(model_path)
+        print('Model loaded')
 
     def setup_collect(self):
         '''Perform setup for frame collection'''
@@ -66,7 +85,60 @@ class SerpentRivalsofAetherGameAgent(GameAgent):
         '''Frame handler for play mode. To invoke, run:
         serpent play RivalsofAether SerpentRivalsofAetherGameAgent PLAY
         '''
-        pass # TODO this
+        x = np.array([game_frame.quarter_resolution_frame])
+        # https://stackoverflow.com/a/12201744
+        x = np.dot(x[...,:3], [0.299, 0.587, 0.114])
+        y = self.model.predict(x, batch_size=1)
+        y = y.tolist()[0]
+        actions = [ 'L', 'R', 'U', 'D', 'ATK', 'SPC', 'JMP', 'DGD', 'STR' ]
+
+        printout = ''
+        for a,v in zip(actions, y):
+            printout += a + ': ' + str(v) + '\t'
+        print(printout)
+
+        if (y[Classes.LEFT.value] >= THRESHOLD
+        and y[Classes.LEFT.value] > y[Classes.RIGHT.value]):
+            self.input_controller.press_key(self.input_mapping['LEFT'])
+            self.input_controller.release_key(self.input_mapping['RIGHT'])
+        elif (y[Classes.RIGHT.value] >= THRESHOLD
+        and y[Classes.RIGHT.value] > y[Classes.LEFT.value]):
+            self.input_controller.press_key(self.input_mapping['RIGHT'])
+            self.input_controller.release_key(self.input_mapping['LEFT'])
+
+        if (y[Classes.UP.value] >= THRESHOLD
+            and y[Classes.UP.value] > y[Classes.DOWN.value]):
+            self.input_controller.press_key(self.input_mapping['UP'])
+            self.input_controller.release_key(self.input_mapping['DOWN'])
+        elif (y[Classes.DOWN.value] >= THRESHOLD
+            and y[Classes.DOWN.value] > y[Classes.UP.value]):
+            self.input_controller.press_key(self.input_mapping['DOWN'])
+            self.input_controller.release_key(self.input_mapping['UP'])
+
+        if y[Classes.ATTACK.value] > THRESHOLD:
+            self.input_controller.press_key(self.input_mapping['ATTACK'])
+        else:
+            self.input_controller.release_key(self.input_mapping['ATTACK'])
+
+        if y[Classes.SPECIAL.value] == 1:
+            self.input_controller.press_key(self.input_mapping['SPECIAL'])
+        else:
+            self.input_controller.release_key(self.input_mapping['SPECIAL'])
+
+        if y[Classes.JUMP.value] == 1:
+            self.input_controller.press_key(self.input_mapping['JUMP'])
+        else:
+            self.input_controller.release_key(self.input_mapping['JUMP'])
+
+        if y[Classes.DODGE.value] == 1:
+            self.input_controller.press_key(self.input_mapping['DODGE'])
+        else:
+            self.input_controller.release_key(self.input_mapping['DODGE'])
+
+        if y[Classes.STRONG.value] == 1:
+            self.input_controller.press_key(self.input_mapping['STRONG'])
+        else:
+            self.input_controller.release_key(self.input_mapping['STRONG'])
 
     def handle_collect(self, game_frame):
         '''Frame handler for frame collection mode. To invoke, run:
@@ -77,7 +149,8 @@ class SerpentRivalsofAetherGameAgent(GameAgent):
             roa_apath = self.manager.next_roa()
             # Case 1-exception: No replays left
             if not roa_apath:
-                print('^w^ ~ Done collecting')
+                total = len(self.manager.subdataset)
+                print('^w^ ~ Done collecting for {} replays'.format(total))
                 sys.exit()
             self.roa = Replay(roa_apath)
             duration = self.roa.get_duration()
@@ -106,7 +179,11 @@ class SerpentRivalsofAetherGameAgent(GameAgent):
                 print(printout)
             # State 2-B: Playback end
             else:
-                print('uwu ~ Finished watching ')
+                printout = 'uwu ~ Finished watching'
+                visited = len(self.manager.subdataset_visited)
+                unvisited = len(self.manager.subdataset_unvisited)
+                printout += '\t{}:{}'.format(visited, unvisited)
+                print(printout)
                 roa_matrices = [
                     p.collapse_actions() for p in self.roa.players
                     ]
@@ -139,3 +216,36 @@ class SerpentRivalsofAetherGameAgent(GameAgent):
                 token = int(token)
                 if token > 0:
                     time.sleep(token)
+
+
+class Classes(enum.Enum):
+    LEFT = 0
+    RIGHT = 1
+    UP = 2
+    DOWN = 3
+    ATTACK = 4
+    SPECIAL = 5
+    JUMP = 6
+    DODGE = 7
+    STRONG = 8
+
+
+class Game:
+    FRAMES_PER_SECOND = 60.0
+    class State(enum.Enum):
+        SPLASH_SCREEN = enum.auto()
+        MAIN_MENU = enum.auto()
+        REPLAY_MENU = enum.auto()
+        REPLAY_PLAYBACK = enum.auto()
+        CHARACTER_SELECTION = enum.auto()
+        STAGE_SELECTION = enum.auto()
+        GAMEPLAY = enum.auto()
+
+    class Sequence:
+        '''The first element is the default delay between key presses, and all
+        subsequent elements are either key names or timed delays.'''
+        splash_to_main = [1.5, 'Z', 'X', 'Z', 'Z', 'Z', 'Z']
+        main_to_replay = [0.5, 'DOWN', 'DOWN', 'DOWN', 'Z', 1, 'Z']
+        start_replay_1 = [1, 'Z', 'Z', 0]
+        back_and_forth = [1, 'X', 'Z']
+        end_postreplay = [2, 6, 'Z', 'Z', 3]
