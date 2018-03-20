@@ -17,7 +17,7 @@ import time
 import sys
 
 
-THRESHOLD = 0.09
+THRESHOLD = 0.1
 
 
 class SerpentRivalsofAetherGameAgent(GameAgent):
@@ -101,6 +101,7 @@ class SerpentRivalsofAetherGameAgent(GameAgent):
             printout += a + ': {0:.3f}'.format(v) + '\t'
         print(printout)
 
+        # Move left/right
         if (y[Classes.LEFT.value] >= THRESHOLD
         and y[Classes.LEFT.value] > y[Classes.RIGHT.value]):
             self.input_controller.press_key(self.input_mapping['LEFT'])
@@ -110,6 +111,7 @@ class SerpentRivalsofAetherGameAgent(GameAgent):
             self.input_controller.press_key(self.input_mapping['RIGHT'])
             self.input_controller.release_key(self.input_mapping['LEFT'])
 
+        # Move up/down
         if (y[Classes.UP.value] >= THRESHOLD
             and y[Classes.UP.value] > y[Classes.DOWN.value]):
             self.input_controller.press_key(self.input_mapping['UP'])
@@ -119,27 +121,32 @@ class SerpentRivalsofAetherGameAgent(GameAgent):
             self.input_controller.press_key(self.input_mapping['DOWN'])
             self.input_controller.release_key(self.input_mapping['UP'])
 
-        if y[Classes.ATTACK.value] > THRESHOLD:
+        # Attack
+        if y[Classes.ATTACK.value] >= THRESHOLD:
             self.input_controller.press_key(self.input_mapping['ATTACK'])
         else:
             self.input_controller.release_key(self.input_mapping['ATTACK'])
 
-        if y[Classes.SPECIAL.value] == 1:
+        # Special attack
+        if y[Classes.SPECIAL.value] >= THRESHOLD:
             self.input_controller.press_key(self.input_mapping['SPECIAL'])
         else:
             self.input_controller.release_key(self.input_mapping['SPECIAL'])
 
-        if y[Classes.JUMP.value] == 1:
+        # Jump
+        if y[Classes.JUMP.value] >= THRESHOLD:
             self.input_controller.press_key(self.input_mapping['JUMP'])
         else:
             self.input_controller.release_key(self.input_mapping['JUMP'])
 
-        if y[Classes.DODGE.value] == 1:
+        # Dodge
+        if y[Classes.DODGE.value] >= THRESHOLD:
             self.input_controller.press_key(self.input_mapping['DODGE'])
         else:
             self.input_controller.release_key(self.input_mapping['DODGE'])
 
-        if y[Classes.STRONG.value] == 1:
+        # Strong attack
+        if y[Classes.STRONG.value] >= THRESHOLD:
             self.input_controller.press_key(self.input_mapping['STRONG'])
         else:
             self.input_controller.release_key(self.input_mapping['STRONG'])
