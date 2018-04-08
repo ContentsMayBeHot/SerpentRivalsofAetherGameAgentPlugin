@@ -92,8 +92,7 @@ class SerpentRivalsofAetherGameAgent(GameAgent):
 
         # Make prediction
         y = self.model.predict(x)
-        y = y.tolist()[0]
-
+        y = y.tolist()[0][0]  # [BATCH [TIMESTEP [ACTIONS ...]]]
         # Display labels
         actnames = [ 'L', 'R', 'U', 'D', 'ATK', 'SPC', 'JMP', 'DGD', 'STR' ]
         printout = ''
