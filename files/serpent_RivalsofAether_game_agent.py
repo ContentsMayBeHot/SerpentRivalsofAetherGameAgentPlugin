@@ -65,12 +65,12 @@ class SerpentRivalsofAetherGameAgent(GameAgent):
         # Turn off CPU feature warnings
         os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
         # Load ML model
-        model_path = os.path.join('plugins',
-                                  'SerpentRivalsofAetherGameAgentPlugin',
-                                  'files', 'ml_models', 'rival.h5')
-        print('Loading model.')
+        model_path = os.path.join(os.path.abspath(os.path.dirname(__file__)),
+                                  'ml_models',
+                                  'rival.h5')
+        print('Loading model at', model_path)
         self.model = keras.models.load_model(model_path)
-        print(self.model.summary())
+        self.model.summary()
 
     def setup_collect(self):
         '''Perform setup for frame collection'''
@@ -88,10 +88,10 @@ class SerpentRivalsofAetherGameAgent(GameAgent):
         '''
         x = np.array([game_frame.quarter_resolution_frame])
         # https://stackoverflow.com/a/12201744
-        x = np.dot(x[...,:3], [0.299, 0.587, 0.114])
+        x = np.dot(x[...,:3], [0.299, 0.587, 0.114]).reshape(1, 1, 135, 240, 1)
 
         # Make prediction
-        y = self.model.predict(x, batch_size=1)
+        y = self.model.predict(x)
         y = y.tolist()[0]
 
         # Display labels
