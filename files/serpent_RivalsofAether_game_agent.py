@@ -15,9 +15,27 @@ import numpy as np
 import os
 import time
 import sys
+from keras.models import Sequential
+from keras.layers import Dense, Reshape, GlobalAveragePooling2D, AveragePooling3D  # noqa
+from keras.layers.convolutional_recurrent import ConvLSTM2D
+from keras.layers.normalization import BatchNormalization
 
 
 THRESHOLD = 0.1
+
+CLASSES = 9
+IMG_U = 135
+IMG_V = 240
+IMG_C = 1
+CLIP_LENGTH = 1
+CLIP_X_SHAPE = (CLIP_LENGTH, IMG_U, IMG_V, IMG_C)
+CLIP_Y_SHAPE = (CLIP_LENGTH, CLASSES)
+BATCH_X_SHAPE = (1, CLIP_LENGTH, IMG_U, IMG_V, IMG_C)
+BATCH_Y_SHAPE = (1, CLIP_LENGTH, CLASSES)
+
+FILTERS = 10
+POOL_SIZE = (1, 135, 240)
+KERNEL_SIZE = (3, 3)
 
 
 class SerpentRivalsofAetherGameAgent(GameAgent):
@@ -65,12 +83,40 @@ class SerpentRivalsofAetherGameAgent(GameAgent):
         # Turn off CPU feature warnings
         os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
         # Load ML model
-        model_path = os.path.join(os.path.abspath(os.path.dirname(__file__)),
-                                  'ml_models',
-                                  'rival.h5')
-        print('Loading model at', model_path)
-        self.model = keras.models.load_model(model_path)
+        self.model = keras.models.Sequential()
+        self.model.add(ConvLSTM2D(
+                filters=FILTERS,
+                kernel_size=KERNEL_SIZE,
+                batch_input_shape=BATCH_X_SHAPE,
+                data_format='channels_last',
+                padding='same',
+                return_sequences=True,
+                stateful=True
+        ))  # noqa
+        self.model.add(BatchNormalization())
+        self.model.add(ConvLSTM2D(
+                filters=FILTERS,
+                kernel_size=KERNEL_SIZE,
+                data_format='channels_last',
+                padding='same',
+                return_sequences=True,
+                stateful=True
+        ))  # noqa
+        self.model.add(BatchNormalization())
+        self.model.add(AveragePooling3D(POOL_SIZE))
+        self.model.add(Reshape((-1, FILTERS)))
+        self.model.add(Dense(CLASSES, activation='sigmoid'))
+        self.model.compile(
+                loss='categorical_crossentropy',
+                optimizer='adadelta',
+                metrics=['accuracy']
+        )  # noqa
         self.model.summary()
+        weights_path = os.path.join(os.path.abspath(os.path.dirname(__file__)),
+                                  'ml_models',
+                                  'rival-w.h5')
+        print('Loading weights at', weights_path)
+        self.model.load_weights(weights_path)
 
     def setup_collect(self):
         '''Perform setup for frame collection'''
