@@ -13,8 +13,10 @@ import keras
 import matplotlib.pyplot as plt
 import numpy as np
 import os
-import time
+import pandas as pd
+import signal
 import sys
+import time
 from keras.models import Sequential
 from keras.layers import Dense, Reshape, GlobalAveragePooling2D, AveragePooling3D  # noqa
 from keras.layers.convolutional_recurrent import ConvLSTM2D
@@ -117,6 +119,20 @@ class SerpentRivalsofAetherGameAgent(GameAgent):
                                   'rival-w.h5')
         print('Loading weights at', weights_path)
         self.model.load_weights(weights_path)
+        self.predictions = []
+        signal.signal(signal.SIGINT, self.signal_handler)
+
+    def signal_handler(self, signal, frame):
+        print('CTRL+C detected')
+        cols = [ 'L', 'R', 'U', 'D', 'ATK', 'SPC', 'JMP', 'DGD', 'STR' ]
+        df = pd.DataFrame(data=self.predictions, columns=cols)
+        results_path = os.path.join(
+                os.path.abspath(os.path.dirname(__file__)),
+                'ml_models',
+                'results.csv')
+        df.to_csv(results_path)
+        print('Saved predictions to', results_path)
+        sys.exit(0)
 
     def setup_collect(self):
         '''Perform setup for frame collection'''
@@ -139,6 +155,7 @@ class SerpentRivalsofAetherGameAgent(GameAgent):
         # Make prediction
         y = self.model.predict(x)
         y = y.tolist()[0][0]  # [BATCH [TIMESTEP [ACTIONS ...]]]
+        self.predictions.append(y)
         # Display labels
         actnames = [ 'L', 'R', 'U', 'D', 'ATK', 'SPC', 'JMP', 'DGD', 'STR' ]
         printout = ''
