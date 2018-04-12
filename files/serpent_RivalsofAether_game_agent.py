@@ -23,8 +23,6 @@ from keras.layers.convolutional_recurrent import ConvLSTM2D
 from keras.layers.normalization import BatchNormalization
 
 
-THRESHOLD = 0.1
-
 CLASSES = 9
 IMG_U = 135
 IMG_V = 240
@@ -38,6 +36,39 @@ BATCH_Y_SHAPE = (1, CLIP_LENGTH, CLASSES)
 FILTERS = 10
 POOL_SIZE = (1, 135, 240)
 KERNEL_SIZE = (3, 3)
+
+
+class Classes(enum.Enum):
+    LEFT = 0
+    RIGHT = 1
+    UP = 2
+    DOWN = 3
+    ATTACK = 4
+    SPECIAL = 5
+    JUMP = 6
+    DODGE = 7
+    STRONG = 8
+
+
+class Game:
+    FRAMES_PER_SECOND = 60.0
+    class State(enum.Enum):
+        SPLASH_SCREEN = enum.auto()
+        MAIN_MENU = enum.auto()
+        REPLAY_MENU = enum.auto()
+        REPLAY_PLAYBACK = enum.auto()
+        CHARACTER_SELECTION = enum.auto()
+        STAGE_SELECTION = enum.auto()
+        GAMEPLAY = enum.auto()
+
+    class Sequence:
+        '''The first element is the default delay between key presses, and all
+        subsequent elements are either key names or timed delays.'''
+        splash_to_main = [1.5, 'Z', 'X', 'Z', 'Z', 'Z', 'Z']
+        main_to_replay = [0.5, 'DOWN', 'DOWN', 'DOWN', 'Z', 1, 'Z']
+        start_replay_1 = [1, 'Z', 'Z', 0]
+        back_and_forth = [1, 'X', 'Z']
+        end_postreplay = [2, 6, 'Z', 'Z', 3]
 
 
 class SerpentRivalsofAetherGameAgent(GameAgent):
@@ -120,6 +151,17 @@ class SerpentRivalsofAetherGameAgent(GameAgent):
         print('Loading weights at', weights_path)
         self.model.load_weights(weights_path)
         self.predictions = []
+        self.thresholds = {
+            Classes.LEFT.value: 0.6,
+            Classes.RIGHT.value: 0.6,
+            Classes.UP.value: 0.5,
+            Classes.DOWN.value: 0.4,
+            Classes.ATTACK.value: 0.3,
+            Classes.SPECIAL.value: 0.2,
+            Classes.JUMP.value: 0.5,
+            Classes.DODGE.value: 0.2,
+            Classes.STRONG.value: 0.1
+        }
         signal.signal(signal.SIGINT, self.signal_handler)
 
     def signal_handler(self, signal, frame):
@@ -164,51 +206,66 @@ class SerpentRivalsofAetherGameAgent(GameAgent):
         print(printout)
 
         # Move left/right
-        if (y[Classes.LEFT.value] >= THRESHOLD
-        and y[Classes.LEFT.value] > y[Classes.RIGHT.value]):
+        left = Classes.LEFT.value
+        right = Classes.RIGHT.value
+        if (y[left] >= self.thresholds[left]
+        and y[left] > y[right]):
             self.input_controller.press_key(self.input_mapping['LEFT'])
             self.input_controller.release_key(self.input_mapping['RIGHT'])
-        elif (y[Classes.RIGHT.value] >= THRESHOLD
-        and y[Classes.RIGHT.value] > y[Classes.LEFT.value]):
+        elif (y[right] >= self.thresholds[right]
+        and y[right] > y[left]):
             self.input_controller.press_key(self.input_mapping['RIGHT'])
             self.input_controller.release_key(self.input_mapping['LEFT'])
+        else:
+            self.input_controller.release_key(self.input_mapping['LEFT'])
+            self.input_controller.release_key(self.input_mapping['RIGHT'])
 
         # Move up/down
-        if (y[Classes.UP.value] >= THRESHOLD
-            and y[Classes.UP.value] > y[Classes.DOWN.value]):
+        up = Classes.UP.value
+        down = Classes.DOWN.value
+        if (y[up] >= self.thresholds[up]
+            and y[up] > y[down]):
             self.input_controller.press_key(self.input_mapping['UP'])
             self.input_controller.release_key(self.input_mapping['DOWN'])
-        elif (y[Classes.DOWN.value] >= THRESHOLD
-            and y[Classes.DOWN.value] > y[Classes.UP.value]):
+        elif (y[down] >= self.thresholds[down]
+            and y[down] > y[up]):
             self.input_controller.press_key(self.input_mapping['DOWN'])
             self.input_controller.release_key(self.input_mapping['UP'])
+        else:
+            self.input_controller.release_key(self.input_mapping['UP'])
+            self.input_controller.release_key(self.input_mapping['DOWN'])
 
         # Attack
-        if y[Classes.ATTACK.value] >= THRESHOLD:
+        attack = Classes.ATTACK.value
+        if y[attack] >= self.thresholds[attack]:
             self.input_controller.press_key(self.input_mapping['ATTACK'])
         else:
             self.input_controller.release_key(self.input_mapping['ATTACK'])
 
         # Special attack
-        if y[Classes.SPECIAL.value] >= THRESHOLD:
+        special = Classes.SPECIAL.value
+        if y[special] >= self.thresholds[special]:
             self.input_controller.press_key(self.input_mapping['SPECIAL'])
         else:
             self.input_controller.release_key(self.input_mapping['SPECIAL'])
 
         # Jump
-        if y[Classes.JUMP.value] >= THRESHOLD:
+        jump = Classes.JUMP.value
+        if y[jump] >= self.thresholds[jump]:
             self.input_controller.press_key(self.input_mapping['JUMP'])
         else:
             self.input_controller.release_key(self.input_mapping['JUMP'])
 
         # Dodge
-        if y[Classes.DODGE.value] >= THRESHOLD:
+        dodge = Classes.DODGE.value
+        if y[dodge] >= self.thresholds[dodge]:
             self.input_controller.press_key(self.input_mapping['DODGE'])
         else:
             self.input_controller.release_key(self.input_mapping['DODGE'])
 
         # Strong attack
-        if y[Classes.STRONG.value] >= THRESHOLD:
+        strong = Classes.STRONG.value
+        if y[strong] >= self.thresholds[strong]:
             self.input_controller.press_key(self.input_mapping['STRONG'])
         else:
             self.input_controller.release_key(self.input_mapping['STRONG'])
@@ -289,36 +346,3 @@ class SerpentRivalsofAetherGameAgent(GameAgent):
                 token = int(token)
                 if token > 0:
                     time.sleep(token)
-
-
-class Classes(enum.Enum):
-    LEFT = 0
-    RIGHT = 1
-    UP = 2
-    DOWN = 3
-    ATTACK = 4
-    SPECIAL = 5
-    JUMP = 6
-    DODGE = 7
-    STRONG = 8
-
-
-class Game:
-    FRAMES_PER_SECOND = 60.0
-    class State(enum.Enum):
-        SPLASH_SCREEN = enum.auto()
-        MAIN_MENU = enum.auto()
-        REPLAY_MENU = enum.auto()
-        REPLAY_PLAYBACK = enum.auto()
-        CHARACTER_SELECTION = enum.auto()
-        STAGE_SELECTION = enum.auto()
-        GAMEPLAY = enum.auto()
-
-    class Sequence:
-        '''The first element is the default delay between key presses, and all
-        subsequent elements are either key names or timed delays.'''
-        splash_to_main = [1.5, 'Z', 'X', 'Z', 'Z', 'Z', 'Z']
-        main_to_replay = [0.5, 'DOWN', 'DOWN', 'DOWN', 'Z', 1, 'Z']
-        start_replay_1 = [1, 'Z', 'Z', 0]
-        back_and_forth = [1, 'X', 'Z']
-        end_postreplay = [2, 6, 'Z', 'Z', 3]
