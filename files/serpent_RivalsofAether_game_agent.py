@@ -17,8 +17,8 @@ import pandas as pd
 import signal
 import sys
 import time
-from keras.models import Sequential
-from keras.layers import Dense, Reshape, GlobalAveragePooling2D, AveragePooling3D  # noqa
+from keras.models import Sequential, Model
+from keras.layers import Dense, Reshape, GlobalAveragePooling2D, AveragePooling3D, Input, LSTM, TimeDistributed  # noqa
 from keras.layers.convolutional_recurrent import ConvLSTM2D
 from keras.layers.normalization import BatchNormalization
 
@@ -28,14 +28,106 @@ IMG_U = 135
 IMG_V = 240
 IMG_C = 1
 CLIP_LENGTH = 1
-CLIP_X_SHAPE = (CLIP_LENGTH, IMG_U, IMG_V, IMG_C)
-CLIP_Y_SHAPE = (CLIP_LENGTH, CLASSES)
-BATCH_X_SHAPE = (1, CLIP_LENGTH, IMG_U, IMG_V, IMG_C)
-BATCH_Y_SHAPE = (1, CLIP_LENGTH, CLASSES)
+VISION_INPUT_SHAPE = (1, CLIP_LENGTH, IMG_U, IMG_V, IMG_C)
+ACTIONS_INPUT_SHAPE = (1, CLIP_LENGTH, CLASSES)
+OUTPUT_SHAPE = (1, CLIP_LENGTH, CLASSES)
 
 FILTERS = 10
 POOL_SIZE = (1, 135, 240)
 KERNEL_SIZE = (3, 3)
+
+LSTM_UNITS = 32
+
+DEEP_UNITS = 64
+
+
+def model_ConvLSTM2D():
+    # Define ConvLSTM2D model
+    model = Sequential()
+    model.add(ConvLSTM2D(
+            filters=FILTERS,
+            kernel_size=KERNEL_SIZE,
+            batch_input_shape=VISION_INPUT_SHAPE,
+            data_format='channels_last',
+            padding='same',
+            return_sequences=True,
+            stateful=True
+    ))  # noqa
+    model.add(BatchNormalization())
+    model.add(ConvLSTM2D(
+            filters=FILTERS,
+            kernel_size=KERNEL_SIZE,
+            data_format='channels_last',
+            padding='same',
+            return_sequences=True,
+            stateful=True
+    ))  # noqa
+    model.add(BatchNormalization())
+    model.add(AveragePooling3D(POOL_SIZE))
+    model.add(Reshape((-1, FILTERS)))
+    model.add(Dense(CLASSES, activation='sigmoid'))
+    model.compile(
+            loss='categorical_crossentropy',
+            optimizer='adadelta',
+            metrics=['accuracy']
+    )  # noqa
+    return model
+
+
+def model_functional():
+    # Primary
+    vision_input = Input(
+            batch_shape=VISION_INPUT_SHAPE,
+            name='vision_input')
+    vision_x = ConvLSTM2D(
+            filters=FILTERS,
+            kernel_size=KERNEL_SIZE,
+            batch_input_shape=VISION_INPUT_SHAPE,
+            data_format='channels_last',
+            padding='same',
+            return_sequences=True,
+            stateful=True)(vision_input)
+    vision_x = BatchNormalization()(vision_x)
+    vision_x = ConvLSTM2D(
+            filters=FILTERS,
+            kernel_size=KERNEL_SIZE,
+            data_format='channels_last',
+            padding='same',
+            return_sequences=True,
+            stateful=True)(vision_x)
+    vision_x = BatchNormalization()(vision_x)
+    vision_x = AveragePooling3D(pool_size=POOL_SIZE)(vision_x)
+    vision_out = Reshape(target_shape=(-1, FILTERS))(vision_x)
+
+    # Auxiliary
+    actions_input = Input(
+        batch_shape=ACTIONS_INPUT_SHAPE,
+        name='actions_input'
+    )
+    actions_out = LSTM(
+        units=LSTM_UNITS,
+        return_sequences=True,
+        stateful=True)(actions_input)
+
+    # Combined primary and auxiliary
+    x = keras.layers.concatenate([vision_out, actions_out])
+    x = Dense(units=DEEP_UNITS, activation='relu')(x)
+    x = Dense( units=DEEP_UNITS, activation='relu')(x)
+    x = Dense( units=DEEP_UNITS, activation='relu')(x)
+    main_output = Dense(
+        units=CLASSES,
+        activation='sigmoid',
+        name='main_output')(x)
+
+    # Finished model
+    model = Model(
+            inputs=[vision_input, actions_input],
+            outputs=[main_output])
+    model.compile(
+            loss='categorical_crossentropy',
+            optimizer='adadelta',
+            metrics=['accuracy'])
+    return model
 
 
 class Classes(enum.Enum):
@@ -116,38 +208,11 @@ class SerpentRivalsofAetherGameAgent(GameAgent):
         # Turn off CPU feature warnings
         os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
         # Load ML model
-        self.model = keras.models.Sequential()
-        self.model.add(ConvLSTM2D(
-                filters=FILTERS,
-                kernel_size=KERNEL_SIZE,
-                batch_input_shape=BATCH_X_SHAPE,
-                data_format='channels_last',
-                padding='same',
-                return_sequences=True,
-                stateful=True
-        ))  # noqa
-        self.model.add(BatchNormalization())
-        self.model.add(ConvLSTM2D(
-                filters=FILTERS,
-                kernel_size=KERNEL_SIZE,
-                data_format='channels_last',
-                padding='same',
-                return_sequences=True,
-                stateful=True
-        ))  # noqa
-        self.model.add(BatchNormalization())
-        self.model.add(AveragePooling3D(POOL_SIZE))
-        self.model.add(Reshape((-1, FILTERS)))
-        self.model.add(Dense(CLASSES, activation='sigmoid'))
-        self.model.compile(
-                loss='categorical_crossentropy',
-                optimizer='adadelta',
-                metrics=['accuracy']
-        )  # noqa
+        self.model = model_functional()
         self.model.summary()
         weights_path = os.path.join(os.path.abspath(os.path.dirname(__file__)),
                                   'ml_models',
-                                  'rival-w.h5')
+                                  'rival2-w.h5')
         print('Loading weights at', weights_path)
         self.model.load_weights(weights_path)
         self.predictions = []
@@ -162,6 +227,7 @@ class SerpentRivalsofAetherGameAgent(GameAgent):
             Classes.DODGE.value: 0.2,
             Classes.STRONG.value: 0.1
         }
+        self.y1 = np.zeros(9,)
         signal.signal(signal.SIGINT, self.signal_handler)
 
     def signal_handler(self, signal, frame):
@@ -195,7 +261,8 @@ class SerpentRivalsofAetherGameAgent(GameAgent):
         x = np.dot(x[...,:3], [0.299, 0.587, 0.114]).reshape(1, 1, 135, 240, 1)
 
         # Make prediction
-        y = self.model.predict(x)
+        y = self.model.predict([x, self.y1.reshape((1, 1, 9))])
+        self.y1 = y
         y = y.tolist()[0][0]  # [BATCH [TIMESTEP [ACTIONS ...]]]
         self.predictions.append(y)
         # Display labels
