@@ -40,6 +40,8 @@ LSTM_UNITS = 32
 
 DEEP_UNITS = 64
 
+THRESHOLD = 0.1
+
 
 def model_ConvLSTM2D():
     # Define ConvLSTM2D model
@@ -216,17 +218,6 @@ class SerpentRivalsofAetherGameAgent(GameAgent):
         print('Loading weights at', weights_path)
         self.model.load_weights(weights_path)
         self.predictions = []
-        self.thresholds = {
-            Classes.LEFT.value: 0.6,
-            Classes.RIGHT.value: 0.6,
-            Classes.UP.value: 0.5,
-            Classes.DOWN.value: 0.4,
-            Classes.ATTACK.value: 0.3,
-            Classes.SPECIAL.value: 0.2,
-            Classes.JUMP.value: 0.5,
-            Classes.DODGE.value: 0.2,
-            Classes.STRONG.value: 0.1
-        }
         self.y1 = np.zeros(9,)
         signal.signal(signal.SIGINT, self.signal_handler)
 
@@ -262,9 +253,9 @@ class SerpentRivalsofAetherGameAgent(GameAgent):
 
         # Make prediction
         y = self.model.predict([x, self.y1.reshape((1, 1, 9))])
-        self.y1 = y
         y = y.tolist()[0][0]  # [BATCH [TIMESTEP [ACTIONS ...]]]
         self.predictions.append(y)
+        y1 = list(y)
         # Display labels
         actnames = [ 'L', 'R', 'U', 'D', 'ATK', 'SPC', 'JMP', 'DGD', 'STR' ]
         printout = ''
@@ -275,67 +266,88 @@ class SerpentRivalsofAetherGameAgent(GameAgent):
         # Move left/right
         left = Classes.LEFT.value
         right = Classes.RIGHT.value
-        if (y[left] >= self.thresholds[left]
-        and y[left] > y[right]):
+        if y[left] >= THRESHOLD and y[left] > y[right]:
             self.input_controller.press_key(self.input_mapping['LEFT'])
             self.input_controller.release_key(self.input_mapping['RIGHT'])
-        elif (y[right] >= self.thresholds[right]
-        and y[right] > y[left]):
+            y1[left] = 1
+            y1[right] = 0
+        elif y[right] >= THRESHOLD and y[right] > y[left]:
             self.input_controller.press_key(self.input_mapping['RIGHT'])
             self.input_controller.release_key(self.input_mapping['LEFT'])
+            y1[right] = 1
+            y1[left] = 0
         else:
             self.input_controller.release_key(self.input_mapping['LEFT'])
             self.input_controller.release_key(self.input_mapping['RIGHT'])
+            y1[left] = 0
+            y1[right] = 0
 
         # Move up/down
         up = Classes.UP.value
         down = Classes.DOWN.value
-        if (y[up] >= self.thresholds[up]
-            and y[up] > y[down]):
+        if y[up] >= THRESHOLD and y[up] > y[down]:
             self.input_controller.press_key(self.input_mapping['UP'])
             self.input_controller.release_key(self.input_mapping['DOWN'])
-        elif (y[down] >= self.thresholds[down]
-            and y[down] > y[up]):
+            y1[up] = 1
+            y1[down] = 0
+        elif (y[down] >= THRESHOLD and y[down] > y[up]):
             self.input_controller.press_key(self.input_mapping['DOWN'])
             self.input_controller.release_key(self.input_mapping['UP'])
+            y1[down] = 1
+            y1[up] = 0
         else:
             self.input_controller.release_key(self.input_mapping['UP'])
             self.input_controller.release_key(self.input_mapping['DOWN'])
+            y1[up] = 0
+            y1[down] = 0
 
         # Attack
         attack = Classes.ATTACK.value
-        if y[attack] >= self.thresholds[attack]:
+        if y[attack] >= THRESHOLD:
             self.input_controller.press_key(self.input_mapping['ATTACK'])
+            y1[attack] = 1
         else:
             self.input_controller.release_key(self.input_mapping['ATTACK'])
+            y1[attack] = 0
 
         # Special attack
         special = Classes.SPECIAL.value
-        if y[special] >= self.thresholds[special]:
+        if y[special] >= THRESHOLD:
             self.input_controller.press_key(self.input_mapping['SPECIAL'])
+            y1[special] = 1
         else:
             self.input_controller.release_key(self.input_mapping['SPECIAL'])
+            y1[special] = 0
 
         # Jump
         jump = Classes.JUMP.value
-        if y[jump] >= self.thresholds[jump]:
+        if y[jump] >= THRESHOLD:
             self.input_controller.press_key(self.input_mapping['JUMP'])
+            y1[jump] = 1
         else:
             self.input_controller.release_key(self.input_mapping['JUMP'])
+            y1[jump] = 0
 
         # Dodge
         dodge = Classes.DODGE.value
-        if y[dodge] >= self.thresholds[dodge]:
+        if y[dodge] >= THRESHOLD:
             self.input_controller.press_key(self.input_mapping['DODGE'])
+            y1[dodge] = 1
         else:
             self.input_controller.release_key(self.input_mapping['DODGE'])
+            y1[dodge] = 0
 
         # Strong attack
         strong = Classes.STRONG.value
-        if y[strong] >= self.thresholds[strong]:
+        if y[strong] >= THRESHOLD:
             self.input_controller.press_key(self.input_mapping['STRONG'])
+            y1[strong] = 1
         else:
             self.input_controller.release_key(self.input_mapping['STRONG'])
+            y1[strong] = 0
+
+        # Set previous prediction
+        self.y1 = np.array(y).reshape((1, 1, 9))
 
     def handle_collect(self, game_frame):
         '''Frame handler for frame collection mode. To invoke, run:
