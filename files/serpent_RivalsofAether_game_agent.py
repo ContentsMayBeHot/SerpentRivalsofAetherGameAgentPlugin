@@ -46,6 +46,7 @@ DROPOUT_RATE = 0.2
 
 
 THRESHOLD = 0.5
+RELEASE_SECONDS = 2
 
 
 def model_functional():
@@ -108,6 +109,17 @@ class Classes(enum.Enum):
     JUMP = 6
     DODGE = 7
     STRONG = 8
+# Shortcut constants for use as indexes
+LEFT = Classes.LEFT.value
+RIGHT = Classes.RIGHT.value
+UP = Classes.UP.value
+DOWN = Classes.DOWN.value
+STRONG = Classes.STRONG.value
+ATTACK = Classes.ATTACK.value
+SPECIAL = Classes.SPECIAL.value
+JUMP = Classes.JUMP.value
+DODGE = Classes.DODGE.value
+STRONG = Classes.STRONG.value
 
 
 class Game:
@@ -145,18 +157,27 @@ class SerpentRivalsofAetherGameAgent(GameAgent):
         self.input_mapping = {
             'Z': KeyboardKey.KEY_Z,
             'JUMP': KeyboardKey.KEY_Z,
+            JUMP: KeyboardKey.KEY_Z,
             'X': KeyboardKey.KEY_X,
             'ATTACK': KeyboardKey.KEY_X,
+            ATTACK: KeyboardKey.KEY_X,
             'C': KeyboardKey.KEY_C,
             'SPECIAL': KeyboardKey.KEY_C,
+            SPECIAL: KeyboardKey.KEY_C,
             'D': KeyboardKey.KEY_D,
             'STRONG': KeyboardKey.KEY_D,
+            STRONG: KeyboardKey.KEY_D,
             'S': KeyboardKey.KEY_S,
             'DODGE': KeyboardKey.KEY_S,
+            DODGE: KeyboardKey.KEY_S,
             'UP': KeyboardKey.KEY_UP,
+            UP: KeyboardKey.KEY_UP,
             'DOWN': KeyboardKey.KEY_DOWN,
+            DOWN: KeyboardKey.KEY_DOWN,
             'LEFT': KeyboardKey.KEY_LEFT,
-            'RIGHT': KeyboardKey.KEY_RIGHT
+            LEFT: KeyboardKey.KEY_LEFT,
+            'RIGHT': KeyboardKey.KEY_RIGHT,
+            RIGHT: KeyboardKey.KEY_RIGHT
         }
         self.key_mapping = {
             KeyboardKey.KEY_Z.name: 'JUMP',
@@ -169,6 +190,17 @@ class SerpentRivalsofAetherGameAgent(GameAgent):
             KeyboardKey.KEY_LEFT.name: 'LEFT',
             KeyboardKey.KEY_RIGHT.name: 'RIGHT'
         }
+        self.all_keys = [
+            KeyboardKey.KEY_Z,
+            KeyboardKey.KEY_X,
+            KeyboardKey.KEY_C,
+            KeyboardKey.KEY_D,
+            KeyboardKey.KEY_S,
+            KeyboardKey.KEY_UP,
+            KeyboardKey.KEY_DOWN,
+            KeyboardKey.KEY_LEFT,
+            KeyboardKey.KEY_RIGHT
+        ]
 
     def setup_play(self):
         '''Perform setup for play'''
@@ -186,6 +218,7 @@ class SerpentRivalsofAetherGameAgent(GameAgent):
         self.predictions = []
         self.y1 = np.ones(9,).reshape((1, 1, 9))
         signal.signal(signal.SIGINT, self.signal_handler)
+        self.timestamp = time.time()
 
     def signal_handler(self, signal, frame):
         print('CTRL+C detected')
@@ -228,63 +261,45 @@ class SerpentRivalsofAetherGameAgent(GameAgent):
         keys_to_press = []
 
         # Move left/right
-        left = Classes.LEFT.value
-        right = Classes.RIGHT.value
-        y1[left] = 0
-        y1[right] = 0
-        if y[left] >= THRESHOLD and y[left] - y[right] > THRESHOLD / 2:
+        y1[LEFT] = 0
+        y1[RIGHT] = 0
+        if y[LEFT] >= THRESHOLD and y[LEFT] - y[RIGHT] > THRESHOLD / 2:
             keys_to_press.append(self.input_mapping['LEFT'])
-            y1[left] = 1
-        elif y[right] >= THRESHOLD and y[right] - y[left] > THRESHOLD / 2:
+            y1[LEFT] = 1
+        elif y[RIGHT] >= THRESHOLD and y[RIGHT] - y[LEFT] > THRESHOLD / 2:
             keys_to_press.append(self.input_mapping['RIGHT'])
-            y1[right] = 1
+            y1[RIGHT] = 1
 
         # Move up/down
-        up = Classes.UP.value
-        down = Classes.DOWN.value
-        y1[up] = 0
-        y1[down] = 0
-        if y[up] >= THRESHOLD and y[up] - y[down] > THRESHOLD / 2:
+        y1[UP] = 0
+        y1[DOWN] = 0
+        if y[UP] >= THRESHOLD and y[UP] - y[DOWN] > THRESHOLD / 2:
             keys_to_press.append(self.input_mapping['UP'])
-            y1[up] = 1
-        elif y[down] >= THRESHOLD and y[down] - y[up] > THRESHOLD / 2:
+            y1[UP] = 1
+        elif y[DOWN] >= THRESHOLD and y[DOWN] - y[UP] > THRESHOLD / 2:
             keys_to_press.append(self.input_mapping['DOWN'])
-            y1[down] = 1
+            y1[DOWN] = 1
 
-        # Attack
-        attack = Classes.ATTACK.value
-        y1[attack] = 0
-        if y[attack] >= THRESHOLD:
-            keys_to_press.append(self.input_mapping['ATTACK'])
-            y1[attack] = 1
+        y1[ATTACK] = 0
+        y1[SPECIAL] = 0
+        y1[JUMP] = 0
+        y1[DODGE] = 0
+        y1[STRONG] = 0
+        options = [
+            (a, y[a]) for a in (ATTACK, SPECIAL, JUMP, DODGE, STRONG)
+            ]
+        action, value = max(options, key=lambda x: x[1])
+        if value > THRESHOLD:
+            y1[action] = 1
+            keys_to_press.append(self.input_mapping[action])
 
-        # Special attack
-        special = Classes.SPECIAL.value
-        y1[special] = 0
-        if y[special] >= THRESHOLD:
-            keys_to_press.append(self.input_mapping['SPECIAL'])
-            y1[special] = 1
-
-        # Jump
-        jump = Classes.JUMP.value
-        y1[jump] = 0
-        if y[jump] >= THRESHOLD:
-            keys_to_press.append(self.input_mapping['JUMP'])
-            y1[jump] = 1
-
-        # Dodge
-        dodge = Classes.DODGE.value
-        y1[dodge] = 0
-        if y[dodge] >= THRESHOLD:
-            keys_to_press.append(self.input_mapping['DODGE'])
-            y1[dodge] = 1
-
-        # Strong attack
-        strong = Classes.STRONG.value
-        y1[strong] = 0
-        if y[strong] >= THRESHOLD:
-            keys_to_press.append(self.input_mapping['STRONG'])
-            y1[strong] = 1
+        new_timestamp = time.time()
+        if new_timestamp - self.timestamp > RELEASE_SECONDS:
+            print('')
+            for k in self.all_keys[:5]:
+                if k in keys_to_press:
+                    keys_to_press.remove(k)
+            self.timestamp = new_timestamp
 
         # Press and release keys
         self.input_controller.handle_keys(keys_to_press)
