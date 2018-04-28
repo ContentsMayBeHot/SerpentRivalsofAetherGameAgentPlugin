@@ -18,69 +18,42 @@ import signal
 import sys
 import time
 from keras.models import Sequential, Model
-from keras.layers import Dense, Reshape, GlobalAveragePooling2D, AveragePooling3D, Input, LSTM, TimeDistributed  # noqa
+from keras.layers import Dense, Reshape, GlobalAveragePooling2D, AveragePooling3D, Input, LSTM, TimeDistributed, Dropout, Conv2D  # noqa
 from keras.layers.convolutional_recurrent import ConvLSTM2D
 from keras.layers.normalization import BatchNormalization
+from skimage.transform import resize
 
+
+MODEL_FNAME = 'rival-w.h5'
 
 CLASSES = 9
-IMG_U = 135
-IMG_V = 240
+IMG_U = 45
+IMG_V = 80
 IMG_C = 1
 CLIP_LENGTH = 1
 VISION_INPUT_SHAPE = (1, CLIP_LENGTH, IMG_U, IMG_V, IMG_C)
 ACTIONS_INPUT_SHAPE = (1, CLIP_LENGTH, CLASSES)
 OUTPUT_SHAPE = (1, CLIP_LENGTH, CLASSES)
 
-FILTERS = 10
-POOL_SIZE = (1, 135, 240)
+FILTERS = 32
+POOL_SIZE = (1, IMG_U, IMG_V)
 KERNEL_SIZE = (3, 3)
 
-LSTM_UNITS = 32
+LSTM_UNITS = 48
 
-DEEP_UNITS = 64
+DEEP_UNITS = 256
+DROPOUT_RATE = 0.2
 
-THRESHOLD = 0.1
 
-
-def model_ConvLSTM2D():
-    # Define ConvLSTM2D model
-    model = Sequential()
-    model.add(ConvLSTM2D(
-            filters=FILTERS,
-            kernel_size=KERNEL_SIZE,
-            batch_input_shape=VISION_INPUT_SHAPE,
-            data_format='channels_last',
-            padding='same',
-            return_sequences=True,
-            stateful=True
-    ))  # noqa
-    model.add(BatchNormalization())
-    model.add(ConvLSTM2D(
-            filters=FILTERS,
-            kernel_size=KERNEL_SIZE,
-            data_format='channels_last',
-            padding='same',
-            return_sequences=True,
-            stateful=True
-    ))  # noqa
-    model.add(BatchNormalization())
-    model.add(AveragePooling3D(POOL_SIZE))
-    model.add(Reshape((-1, FILTERS)))
-    model.add(Dense(CLASSES, activation='sigmoid'))
-    model.compile(
-            loss='categorical_crossentropy',
-            optimizer='adadelta',
-            metrics=['accuracy']
-    )  # noqa
-    return model
+THRESHOLD = 0.5
 
 
 def model_functional():
-    # Primary
+    # Primary input: Image data
     vision_input = Input(
             batch_shape=VISION_INPUT_SHAPE,
             name='vision_input')
+    # Primary model: 2D convolutional LSTM
     vision_x = ConvLSTM2D(
             filters=FILTERS,
             kernel_size=KERNEL_SIZE,
@@ -90,36 +63,29 @@ def model_functional():
             return_sequences=True,
             stateful=True)(vision_input)
     vision_x = BatchNormalization()(vision_x)
-    vision_x = ConvLSTM2D(
-            filters=FILTERS,
-            kernel_size=KERNEL_SIZE,
-            data_format='channels_last',
-            padding='same',
-            return_sequences=True,
-            stateful=True)(vision_x)
-    vision_x = BatchNormalization()(vision_x)
     vision_x = AveragePooling3D(pool_size=POOL_SIZE)(vision_x)
-    vision_out = Reshape(target_shape=(-1, FILTERS))(vision_x)
+    vision_output = Reshape(target_shape=(-1, FILTERS))(vision_x)
 
-    # Auxiliary
+    # Auxiliary input: Previous labels
     actions_input = Input(
-        batch_shape=ACTIONS_INPUT_SHAPE,
-        name='actions_input'
+            batch_shape=ACTIONS_INPUT_SHAPE,
+            name='actions_input'
     )
-    actions_out = LSTM(
-        units=LSTM_UNITS,
-        return_sequences=True,
-        stateful=True)(actions_input)
 
-    # Combined primary and auxiliary
-    x = keras.layers.concatenate([vision_out, actions_out])
-    x = Dense(units=DEEP_UNITS, activation='relu')(x)
-    x = Dense( units=DEEP_UNITS, activation='relu')(x)
-    x = Dense( units=DEEP_UNITS, activation='relu')(x)
+    # Concatenate primary and auxiliary
+    main_x = keras.layers.concatenate([vision_output, actions_input])
+
+    # Deep neural network
+    main_x = LSTM(
+            units=LSTM_UNITS,
+            return_sequences=True,
+            stateful=True)(main_x)
+
+    # Output layer
     main_output = Dense(
         units=CLASSES,
         activation='sigmoid',
-        name='main_output')(x)
+        name='main_output')(main_x)
 
     # Finished model
     model = Model(
@@ -127,7 +93,7 @@ def model_functional():
             outputs=[main_output])
     model.compile(
             loss='categorical_crossentropy',
-            optimizer='adadelta',
+            optimizer='adam',
             metrics=['accuracy'])
     return model
 
@@ -214,11 +180,11 @@ class SerpentRivalsofAetherGameAgent(GameAgent):
         self.model.summary()
         weights_path = os.path.join(os.path.abspath(os.path.dirname(__file__)),
                                   'ml_models',
-                                  'rival2-w.h5')
+                                  MODEL_FNAME)
         print('Loading weights at', weights_path)
         self.model.load_weights(weights_path)
         self.predictions = []
-        self.y1 = np.zeros(9,)
+        self.y1 = np.ones(9,).reshape((1, 1, 9))
         signal.signal(signal.SIGINT, self.signal_handler)
 
     def signal_handler(self, signal, frame):
@@ -249,10 +215,13 @@ class SerpentRivalsofAetherGameAgent(GameAgent):
         '''
         x = np.array([game_frame.quarter_resolution_frame])
         # https://stackoverflow.com/a/12201744
-        x = np.dot(x[...,:3], [0.299, 0.587, 0.114]).reshape(1, 1, 135, 240, 1)
+        x = np.dot(x[...,:3], [0.299, 0.587, 0.114])
+        x = resize(image=x, output_shape=(45, 80, 1), mode='reflect')
+        x = x.reshape(1, 1, 45, 80, 1)
+        y1 = self.y1
 
         # Make prediction
-        y = self.model.predict([x, self.y1.reshape((1, 1, 9))])
+        y = self.model.predict([x, y1])
         y = y.tolist()[0][0]  # [BATCH [TIMESTEP [ACTIONS ...]]]
         self.predictions.append(y)
         y1 = list(y)
@@ -263,10 +232,10 @@ class SerpentRivalsofAetherGameAgent(GameAgent):
         right = Classes.RIGHT.value
         y1[left] = 0
         y1[right] = 0
-        if y[left] >= THRESHOLD and y[left] > y[right]:
+        if y[left] >= THRESHOLD and y[left] - y[right] > THRESHOLD / 2:
             keys_to_press.append(self.input_mapping['LEFT'])
             y1[left] = 1
-        elif y[right] >= THRESHOLD and y[right] > y[left]:
+        elif y[right] >= THRESHOLD and y[right] - y[left] > THRESHOLD / 2:
             keys_to_press.append(self.input_mapping['RIGHT'])
             y1[right] = 1
 
@@ -275,10 +244,10 @@ class SerpentRivalsofAetherGameAgent(GameAgent):
         down = Classes.DOWN.value
         y1[up] = 0
         y1[down] = 0
-        if y[up] >= THRESHOLD and y[up] > y[down]:
+        if y[up] >= THRESHOLD and y[up] - y[down] > THRESHOLD / 2:
             keys_to_press.append(self.input_mapping['UP'])
             y1[up] = 1
-        elif (y[down] >= THRESHOLD and y[down] > y[up]):
+        elif y[down] >= THRESHOLD and y[down] - y[up] > THRESHOLD / 2:
             keys_to_press.append(self.input_mapping['DOWN'])
             y1[down] = 1
 
